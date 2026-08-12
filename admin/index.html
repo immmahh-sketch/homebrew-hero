@@ -355,6 +355,7 @@
     <button class="tab-btn" data-tab="calls">AI Call Log</button>
     <button class="tab-btn" data-tab="kits">Recognized Kits</button>
     <button class="tab-btn" data-tab="suggestions">Feature Suggestions</button>
+    <button class="tab-btn" data-tab="testers">Tester Applications</button>
   </nav>
 
   <main>
@@ -513,6 +514,32 @@
     <section class="panel" id="panel-suggestions">
       <div id="suggestionsList"><div class="load-note">Loading…</div></div>
     </section>
+
+    <!-- TESTER APPLICATIONS -->
+    <section class="panel" id="panel-testers">
+      <p class="load-note" style="margin-bottom:14px;">
+        From the public "Become a Tester" form. Premium itself grants automatically the moment an
+        applicant signs into the app — this list is for recruitment/vetting and for pulling the plug
+        via Cancel Premium if someone stops engaging. Engagement columns are placeholders until that's wired up.
+      </p>
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Applied</th>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Android</th>
+            <th>Phone</th>
+            <th>Notes</th>
+            <th>Last Open</th>
+            <th>Engagements</th>
+            <th>AI Spend</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="testersBody"><tr><td colspan="10" class="empty-note">Loading…</td></tr></tbody>
+      </table>
+    </section>
   </main>
 </div>
 
@@ -533,7 +560,7 @@
   const ANON_KEY = 'sb_publishable_tFB-sh1Zh7lk0StvG9aGdw_v6LCEyck';
 
   let SECRET = localStorage.getItem('hh_admin_secret') || '';
-  let usersData = null, devicesData = null, kitsData = null, spendData = null, callsData = null, suggestionsData = null;
+  let usersData = null, devicesData = null, kitsData = null, spendData = null, callsData = null, suggestionsData = null, testersData = null;
   let uptakeData = null, revenueData = null, profitData = null;
   let deviceFilter = 'all';
   let callFeatureFilter = 'all';
@@ -591,7 +618,35 @@
   function tierPillClass(t) { return t || 'unknown'; }
 
   async function refreshAll() {
-    await Promise.all([loadUsers(), loadDevices(), loadKits(), loadSpend(), loadCalls(), loadUptake(), loadRevenue(), loadProfit(), loadSuggestions()]);
+    await Promise.all([loadUsers(), loadDevices(), loadKits(), loadSpend(), loadCalls(), loadUptake(), loadRevenue(), loadProfit(), loadSuggestions(), loadTesters()]);
+  }
+
+  async function loadTesters() {
+    try {
+      testersData = (await call('list_tester_applications')).applications;
+      renderTesters();
+    } catch (e) { console.error(e); }
+  }
+
+  function renderTesters() {
+    const body = document.getElementById('testersBody');
+    if (!testersData || !testersData.length) { body.innerHTML = '<tr><td colspan="10" class="empty-note">No applications yet.</td></tr>'; return; }
+    body.innerHTML = testersData.map((a) => (
+      '<tr>' +
+      '<td>' + fmtDate(a.createdAt) + '</td>' +
+      '<td>' + escapeHtml(a.name || '—') + '</td>' +
+      '<td>' + escapeHtml(a.email || '—') + '</td>' +
+      '<td>' + escapeHtml(a.androidVersion || '—') + '</td>' +
+      '<td>' + escapeHtml(a.phoneMakeModel || '—') + '</td>' +
+      '<td>' + (a.notes ? escapeHtml(a.notes) : '—') + '</td>' +
+      '<td>' + (a.lastAppOpenAt ? fmtDate(a.lastAppOpenAt) : '—') + '</td>' +
+      '<td>' + (a.engagementCount ?? '—') + '</td>' +
+      '<td>' + (a.aiSpendUsd != null ? fmtUsd(a.aiSpendUsd) : '—') + '</td>' +
+      '<td>' + (a.email
+        ? '<button class="btn-sm danger" onclick="cancelPremium(' + JSON.stringify(a.email) + ')">Cancel premium</button>'
+        : '') + '</td>' +
+      '</tr>'
+    )).join('');
   }
 
   async function loadSuggestions() {

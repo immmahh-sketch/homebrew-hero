@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Become a Tester — Homebrew Hero</title>
+<meta name="description" content="Apply to be a founding tester for Homebrew Hero and get 6 months of Power User access free.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,500;0,600;0,700;1,500;1,600&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🍺</text></svg>">
+</head>
+<body>
+
+<header class="site">
+  <div class="wrap">
+    <a href="index.html" class="logo">
+      <span class="mug">🍺</span>
+      <span><span class="word-home">Homebrew</span> <span class="word-hero">Hero</span></span>
+    </a>
+    <nav class="primary">
+      <a href="index.html#features">Features</a>
+      <a href="index.html#hero-ai">Meet Hero</a>
+      <a href="index.html#pricing">Pricing</a>
+    </nav>
+    <a href="index.html" class="btn btn-outline">← Back to site</a>
+  </div>
+</header>
+
+<div class="tester-doc">
+  <span class="eyebrow">Founding Testers</span>
+  <h1>Help us build Homebrew Hero — free for 6 months</h1>
+  <p class="lead">
+    Homebrew Hero is an app for home brewers — AI recipe help, automatic fermentation scheduling,
+    a Popular Clones library, kit-box scanning, and Hero, an AI troubleshooter for the "is this mould?!"
+    moments. It's in closed testing right now, ahead of launching properly on Android and iOS.
+    Read more about the app on the <a href="index.html">main site</a>.
+  </p>
+
+  <div class="perk-card">
+    <h2>What's in it for you</h2>
+    <p>
+      Every account that signs into the app during closed testing automatically gets
+      <strong>6 months of Power User access, completely free</strong> — no code needed, it unlocks
+      the moment you sign in. That's full AI recipe generation and tweaks, unlimited fermenters, the
+      full Popular Clones library, Hero, and the brewer forum, normally £10.99/month (worth over £65).
+    </p>
+  </div>
+
+  <h2>What we need from you</h2>
+  <ul class="reqs">
+    <li><strong>Android 7.0 (Nougat) or later.</strong> The app isn't available for older Android versions.</li>
+    <li><strong>Complete at least one brew</strong> — kit, all-grain, or wine, your choice — within your first month, starting from the day you install.</li>
+    <li>
+      <strong>Use the app consistently for your first 14 days.</strong> This is what actually keeps you
+      counted as an active tester on Google's side — realistically that means opening the app every couple
+      of days and doing something in it (checking a brew, logging a reading, ticking off a schedule step),
+      not just installing it once and forgetting about it.
+    </li>
+    <li><strong>Give us honest feedback</strong> on what worked, what didn't, and what confused you, when we ask for it.</li>
+  </ul>
+
+  <form id="tester-form" class="tester-form">
+    <div class="field">
+      <label for="name">Name</label>
+      <input type="text" id="name" name="name" required autocomplete="name">
+    </div>
+
+    <div class="field">
+      <label for="email">Google Play Store email address</label>
+      <p class="hint">The Google account you'll sign into the app with — this is also the account we'd add to the Play Console closed-testing list.</p>
+      <input type="email" id="email" name="email" required autocomplete="email">
+    </div>
+
+    <div class="field">
+      <label for="androidVersion">Android version</label>
+      <p class="hint">Settings → About phone → Android version.</p>
+      <input type="text" id="androidVersion" name="androidVersion" placeholder="e.g. Android 13" required>
+    </div>
+
+    <div class="field">
+      <label for="phoneModel">Phone make and model</label>
+      <input type="text" id="phoneModel" name="phoneModel" placeholder="e.g. Samsung Galaxy S22" required>
+    </div>
+
+    <div class="field">
+      <label for="notes">Anything else we should know? <span class="optional">(optional)</span></label>
+      <p class="hint">Brewing experience, what you're hoping to test, availability — whatever's useful.</p>
+      <textarea id="notes" name="notes" rows="3"></textarea>
+    </div>
+
+    <fieldset class="agree-block">
+      <legend>Before you apply, please confirm:</legend>
+
+      <label class="check-row">
+        <input type="checkbox" name="agreedAndroidVersion" required>
+        <span>I have an Android device running Android 7.0 (Nougat) or later.</span>
+      </label>
+
+      <label class="check-row">
+        <input type="checkbox" name="agreedOneBrew" required>
+        <span>I'm willing and able to complete at least 1 brew (kit, all-grain, or wine) within my first month of testing, starting from the day I install.</span>
+      </label>
+
+      <label class="check-row">
+        <input type="checkbox" name="agreedActive14Days" required>
+        <span>I'll use the app consistently during my first 14 days, rather than installing it once and leaving it idle.</span>
+      </label>
+
+      <label class="check-row">
+        <input type="checkbox" name="agreedFeedback" required>
+        <span>I'll provide honest feedback on my experience when asked.</span>
+      </label>
+    </fieldset>
+
+    <div class="final-notice">
+      <label class="check-row">
+        <input type="checkbox" name="agreedRemovalIfInactive" required>
+        <span>I understand that if Google deems I haven't engaged enough during the testing period to be classed as an active tester, my access to premium features will be removed immediately.</span>
+      </label>
+    </div>
+
+    <p class="privacy-note">
+      By submitting this form you agree to our <a href="privacy.html">Privacy Policy</a>. We'll only use
+      this information to run the testing programme and add you to the Play Console tester list.
+    </p>
+
+    <button type="submit" class="btn btn-amber submit-btn" id="submit-btn">Submit Application</button>
+    <p id="form-status" class="form-status" role="status"></p>
+  </form>
+</div>
+
+<footer class="site">
+  <div class="wrap">
+    <div>
+      <a href="index.html" class="logo" style="margin-bottom:10px;">
+        <span class="mug">🍺</span>
+        <span><span class="word-home">Homebrew</span> <span class="word-hero">Hero</span></span>
+      </a>
+      <p style="color:var(--text-faint); font-size:13px; max-width:32ch;">Helping you create the perfect brew — for beer, wine, and cider makers everywhere.</p>
+      <p class="copyright">© 2026 Homebrew Hero. All rights reserved.</p>
+    </div>
+    <div class="foot-links">
+      <a href="privacy.html">Privacy Policy</a>
+      <a href="terms.html">Terms of Service</a>
+      <a href="mailto:homebrew.hero.app@gmail.com">Contact</a>
+    </div>
+  </div>
+</footer>
+
+<script>
+  const SUPABASE_URL = 'https://qrihcvanmkdsaojuhasm.supabase.co';
+  const SUPABASE_ANON_KEY = 'sb_publishable_tFB-sh1Zh7lk0StvG9aGdw_v6LCEyck';
+
+  const form = document.getElementById('tester-form');
+  const statusEl = document.getElementById('form-status');
+  const submitBtn = document.getElementById('submit-btn');
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    statusEl.textContent = '';
+    statusEl.className = 'form-status';
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Submitting…';
+
+    const fd = new FormData(form);
+    const payload = {
+      name: String(fd.get('name') || '').trim(),
+      play_store_email: String(fd.get('email') || '').trim().toLowerCase(),
+      android_version: String(fd.get('androidVersion') || '').trim(),
+      phone_make_model: String(fd.get('phoneModel') || '').trim(),
+      additional_notes: String(fd.get('notes') || '').trim() || null,
+      agreed_android_version: fd.get('agreedAndroidVersion') === 'on',
+      agreed_one_brew: fd.get('agreedOneBrew') === 'on',
+      agreed_active_14_days: fd.get('agreedActive14Days') === 'on',
+      agreed_feedback: fd.get('agreedFeedback') === 'on',
+      agreed_removal_if_inactive: fd.get('agreedRemovalIfInactive') === 'on',
+    };
+
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/tester_applications`, {
+        method: 'POST',
+        headers: {
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=minimal',
+        },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        throw new Error(text || `Request failed (${res.status})`);
+      }
+      form.hidden = true;
+      statusEl.textContent = "Thanks! Your application is in — we'll be in touch by email if you're selected.";
+      statusEl.className = 'form-status success';
+      statusEl.hidden = false;
+    } catch (err) {
+      statusEl.textContent = "Something went wrong submitting your application. Please try again, or email homebrew.hero.app@gmail.com directly.";
+      statusEl.className = 'form-status error';
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Submit Application';
+    }
+  });
+</script>
+
+</body>
+</html>
