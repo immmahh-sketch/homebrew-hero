@@ -1,0 +1,967 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Homebrew Hero — Admin</title>
+<link rel="manifest" href="manifest.json" />
+<link rel="icon" href="icon-192.png" />
+<link rel="apple-touch-icon" href="apple-touch-icon.png" />
+<meta name="theme-color" content="#140D08" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="HH Admin" />
+<style>
+  :root {
+    --bg: #14100B;
+    --bg-panel: #1C1712;
+    --bg-panel-2: #241D15;
+    --ink: #F3EADA;
+    --muted: #A8987C;
+    --border: #3A2C1B;
+    --amber: #E3A542;
+    --amber-deep: #C1780F;
+    --green: #4CAF7D;
+    --red: #E0604F;
+    --blue: #6FA8DC;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-size: 14px;
+  }
+  ::-webkit-scrollbar { height: 8px; width: 8px; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+  #loginScreen {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 14px;
+  }
+  #loginScreen h1 { font-family: Georgia, serif; font-size: 22px; margin: 0 0 4px; }
+  #loginScreen p { color: var(--muted); font-size: 13px; margin: 0 0 8px; }
+  #secretInput {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    color: var(--ink);
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 14px;
+    width: 320px;
+    max-width: 80vw;
+  }
+  #loginBtn {
+    background: var(--amber);
+    color: #1C1712;
+    border: none;
+    font-weight: 700;
+    padding: 10px 20px;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  #loginError { color: var(--red); font-size: 13px; min-height: 18px; }
+
+  #app { display: none; }
+  header.top {
+    padding: 18px 26px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  header.top h1 {
+    font-family: Georgia, serif;
+    font-size: 19px;
+    margin: 0;
+    color: var(--amber);
+  }
+  header.top .sub { color: var(--muted); font-size: 12px; }
+
+  nav.tabs {
+    display: flex;
+    gap: 4px;
+    padding: 0 26px;
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+  }
+  nav.tabs button {
+    background: none;
+    border: none;
+    color: var(--muted);
+    padding: 12px 16px;
+    font-size: 13.5px;
+    font-weight: 600;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    white-space: nowrap;
+  }
+  nav.tabs button.active { color: var(--ink); border-bottom-color: var(--amber); }
+
+  main { padding: 22px 26px 60px; max-width: 1200px; margin: 0 auto; }
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  .stat-row { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 22px; }
+  .stat-card {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 18px;
+    min-width: 140px;
+    flex: 1;
+  }
+  .stat-card .label { color: var(--muted); font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 6px; }
+  .stat-card .value { font-size: 24px; font-weight: 700; font-family: Georgia, serif; }
+  .stat-card .value.green { color: var(--green); }
+  .stat-card .value.red { color: var(--red); }
+
+  h2.section-title { font-size: 15px; margin: 26px 0 10px; color: var(--ink); }
+  h2.section-title:first-child { margin-top: 0; }
+
+  .chart-wrap {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px;
+    margin-bottom: 22px;
+  }
+  .bar-chart { display: flex; align-items: flex-end; gap: 3px; height: 160px; overflow-x: auto; padding-bottom: 4px; }
+  .bar-chart .bar-col { flex: 0 0 auto; width: 14px; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; position: relative; }
+  .bar-chart .bar { width: 100%; background: var(--amber-deep); border-radius: 2px 2px 0 0; min-height: 2px; transition: background 0.15s; }
+  .bar-chart .bar-col:hover .bar { background: var(--amber); }
+  .bar-chart .bar-col .tip {
+    display: none;
+    position: absolute;
+    bottom: 100%;
+    margin-bottom: 6px;
+    background: #000;
+    color: var(--ink);
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 11px;
+    white-space: nowrap;
+    z-index: 5;
+  }
+  .bar-chart .bar-col:hover .tip { display: block; }
+
+  /* Diverging variant (profit/loss) — bars grow up from a center baseline for
+     positive values, down for negative. Absolute positioning (not flexbox
+     centering) so each bar's direction/magnitude is set directly in JS via
+     top/bottom + height, rather than relying on cross-axis alignment. */
+  .bar-chart.diverging { position: relative; align-items: stretch; }
+  .bar-chart.diverging::before {
+    content: "";
+    position: absolute;
+    left: 0; right: 0; top: 50%;
+    height: 1px;
+    background: var(--border);
+    z-index: 1;
+  }
+  .bar-chart.diverging .bar-col { position: relative; height: 100%; justify-content: flex-start; }
+  .bar-chart.diverging .bar { position: absolute; left: 0; right: 0; border-radius: 2px; min-height: 2px; }
+  .bar-chart.diverging .bar.profit { background: var(--green); bottom: 50%; border-radius: 2px 2px 0 0; }
+  .bar-chart.diverging .bar.loss { background: var(--red); top: 50%; border-radius: 0 0 2px 2px; }
+
+  .controls-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
+  .filter-btn {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 7px 14px;
+    border-radius: 999px;
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .filter-btn.active { background: var(--amber); border-color: var(--amber); color: #1C1712; }
+  .search-box {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    color: var(--ink);
+    padding: 7px 12px;
+    border-radius: 8px;
+    font-size: 13px;
+    flex: 1;
+    min-width: 180px;
+  }
+  select.sort-select {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    color: var(--ink);
+    padding: 7px 10px;
+    border-radius: 8px;
+    font-size: 12.5px;
+  }
+
+  .grant-box {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-bottom: 16px;
+  }
+  .grant-box-title { font-size: 13px; font-weight: 700; color: var(--ink); margin-bottom: 10px; }
+  .grant-box-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .grant-box-row input[type="text"] {
+    background: var(--bg-panel-2);
+    border: 1px solid var(--border);
+    color: var(--ink);
+    padding: 7px 12px;
+    border-radius: 8px;
+    font-size: 13px;
+    flex: 1;
+    min-width: 240px;
+  }
+  .grant-box-row select {
+    background: var(--bg-panel-2);
+    border: 1px solid var(--border);
+    color: var(--ink);
+    padding: 7px 10px;
+    border-radius: 8px;
+    font-size: 12.5px;
+  }
+  .grant-box-hint { color: var(--muted); font-size: 11.5px; margin-top: 8px; line-height: 1.5; }
+  .grant-box-hint.success { color: var(--green); }
+  .grant-box-hint.error { color: var(--red); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.data-table { background: var(--bg-panel); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  thead th {
+    text-align: left;
+    padding: 10px 12px;
+    background: var(--bg-panel-2);
+    color: var(--muted);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  tbody td { padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: rgba(227,165,66,0.05); }
+  .mono { font-family: "SF Mono", Consolas, monospace; font-size: 11.5px; color: var(--muted); }
+  .pct-bar { display: inline-block; width: 70px; height: 6px; border-radius: 3px; background: var(--bg-panel-2); vertical-align: middle; margin-right: 8px; overflow: hidden; }
+  .pct-fill { display: block; height: 100%; border-radius: 3px; }
+  .pct-fill.green { background: var(--green); }
+  .pct-fill.amber { background: var(--amber); }
+  .pct-fill.red { background: var(--red); }
+  .pct-label { font-size: 11px; color: var(--muted); white-space: nowrap; }
+
+  .pill { display: inline-block; padding: 3px 9px; border-radius: 999px; font-size: 11px; font-weight: 700; }
+  .pill.free { background: rgba(168,152,124,0.18); color: var(--muted); }
+  .pill.standard { background: rgba(111,168,220,0.18); color: var(--blue); }
+  .pill.powerBrewer { background: rgba(227,165,66,0.18); color: var(--amber); }
+  .pill.ultimate { background: rgba(76,175,125,0.18); color: var(--green); }
+  .pill.banned { background: rgba(224,96,79,0.18); color: var(--red); }
+  .pill.unknown { background: rgba(168,152,124,0.1); color: var(--muted); }
+
+  .btn-sm {
+    background: var(--bg-panel-2);
+    border: 1px solid var(--border);
+    color: var(--ink);
+    padding: 5px 10px;
+    border-radius: 6px;
+    font-size: 11.5px;
+    cursor: pointer;
+    font-weight: 600;
+  }
+  .btn-sm.danger { border-color: var(--red); color: var(--red); }
+  .btn-sm.safe { border-color: var(--green); color: var(--green); }
+
+  .empty-note { color: var(--muted); text-align: center; padding: 30px; font-size: 13px; }
+  .load-note { color: var(--muted); text-align: center; padding: 20px; font-size: 13px; }
+
+  .kit-card {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 16px;
+    margin-bottom: 8px;
+  }
+  .kit-card .name { font-weight: 700; }
+  .kit-card .meta { color: var(--muted); font-size: 11.5px; margin-top: 3px; }
+
+  .modal-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.6);
+    align-items: center; justify-content: center;
+    z-index: 50;
+    padding: 20px;
+  }
+  .modal-overlay.active { display: flex; }
+  .modal {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    max-width: 480px;
+    width: 100%;
+  }
+  .modal h3 { margin: 0 0 12px; font-size: 16px; }
+  .modal textarea, .modal input {
+    width: 100%;
+    background: var(--bg-panel-2);
+    border: 1px solid var(--border);
+    color: var(--ink);
+    padding: 8px 10px;
+    border-radius: 6px;
+    font-size: 13px;
+    margin-bottom: 12px;
+    font-family: inherit;
+  }
+  .modal .modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+
+  .footnote { color: var(--muted); font-size: 11.5px; margin-top: 10px; line-height: 1.5; }
+</style>
+</head>
+<body>
+
+<div id="loginScreen">
+  <h1>🍺 Homebrew Hero — Admin</h1>
+  <p>Enter the admin dashboard secret to continue.</p>
+  <input type="password" id="secretInput" placeholder="Admin secret" autocomplete="off" />
+  <button id="loginBtn">Unlock</button>
+  <div id="loginError"></div>
+</div>
+
+<div id="app">
+  <header class="top">
+    <div>
+      <h1>🍺 Homebrew Hero — Admin</h1>
+      <div class="sub">Internal analytics &amp; moderation — not part of the app itself</div>
+    </div>
+    <div style="display:flex; gap:8px; align-items:center;">
+      <a class="btn-sm" style="text-decoration:none; display:inline-block;" href="https://platform.claude.com/dashboard" target="_blank" rel="noopener">💳 Anthropic Balance ↗</a>
+      <button class="btn-sm" onclick="refreshAll()">↻ Refresh all</button>
+    </div>
+  </header>
+
+  <nav class="tabs">
+    <button class="tab-btn active" data-tab="overview">Overview</button>
+    <button class="tab-btn" data-tab="revenue">Revenue &amp; Profit</button>
+    <button class="tab-btn" data-tab="users">Registered Accounts</button>
+    <button class="tab-btn" data-tab="devices">Devices &amp; AI Spend</button>
+    <button class="tab-btn" data-tab="calls">AI Call Log</button>
+    <button class="tab-btn" data-tab="kits">Recognized Kits</button>
+    <button class="tab-btn" data-tab="suggestions">Feature Suggestions</button>
+  </nav>
+
+  <main>
+    <!-- OVERVIEW -->
+    <section class="panel active" id="panel-overview">
+      <div class="stat-row" id="overviewStats"></div>
+
+      <h2 class="section-title">AI spend — last 4 months, by day</h2>
+      <div class="chart-wrap">
+        <div class="bar-chart" id="spendChart"><div class="load-note">Loading…</div></div>
+      </div>
+
+      <div class="footnote">
+        AI spend above is real, based on actual token usage Anthropic returns per call. See the
+        <strong>Revenue &amp; Profit</strong> tab for premium uptake, revenue, and profit/loss.
+      </div>
+    </section>
+
+    <!-- REVENUE & PROFIT -->
+    <section class="panel" id="panel-revenue">
+      <div class="stat-row" id="revenueStats"></div>
+
+      <h2 class="section-title">Premium uptake — cumulative, real data</h2>
+      <div class="chart-wrap">
+        <div class="bar-chart" id="uptakeChart"><div class="load-note">Loading…</div></div>
+      </div>
+      <div class="footnote" style="margin-bottom:22px;">
+        Counts any account with premium enabled, bucketed by the date it went premium — real today regardless of
+        whether that was a real purchase or the free tester grant, since there's no real billing yet to tell them apart.
+      </div>
+
+      <h2 class="section-title">Revenue — last 4 months, by day</h2>
+      <div class="chart-wrap">
+        <div class="bar-chart" id="revenueChart"><div class="load-note">Loading…</div></div>
+      </div>
+      <div class="footnote" id="revenueFootnote" style="margin-bottom:22px;"></div>
+
+      <h2 class="section-title">Profit / loss — real AI spend minus real revenue, by day</h2>
+      <div class="chart-wrap">
+        <div class="bar-chart" id="profitChart"><div class="load-note">Loading…</div></div>
+      </div>
+      <div class="footnote">
+        Bars below the line are a net loss that day (spend with no offsetting revenue), bars above are a net profit.
+        This is a genuinely working chart, not a placeholder — it'll show real profit the moment real purchases land
+        in payment_events, with no further changes needed here.
+      </div>
+    </section>
+
+    <!-- USERS -->
+    <section class="panel" id="panel-users">
+      <div class="stat-row" id="userTierStats"></div>
+      <div class="grant-box">
+        <div class="grant-box-title">Give someone free premium</div>
+        <div class="grant-box-row">
+          <input type="text" id="grantEmailInput" placeholder="Their account email (ask them to find this in Settings)" />
+          <select id="grantTierSelect">
+            <option value="standard">Standard</option>
+            <option value="powerBrewer" selected>Power User</option>
+            <option value="ultimate">Ultimate</option>
+          </select>
+          <button class="btn-sm safe" id="grantBtn" onclick="grantPremiumFromBox()">Grant premium</button>
+        </div>
+        <div class="grant-box-hint" id="grantBoxHint">
+          Ask them to find their account email in the app under Settings → Account. Takes effect next time they open
+          (or foreground) the app. Doesn't expire on its own — use "Cancel" on their row below to take it back.
+        </div>
+      </div>
+      <div class="controls-row">
+        <input class="search-box" id="userSearch" placeholder="Search by email…" oninput="renderUsers()" />
+      </div>
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Email</th><th>Tier</th><th>Premium Since</th><th>Signed Up</th><th>Last Sign-In</th><th></th>
+          </tr>
+        </thead>
+        <tbody id="usersTableBody"><tr><td colspan="6" class="empty-note">Loading…</td></tr></tbody>
+      </table>
+    </section>
+
+    <!-- DEVICES -->
+    <section class="panel" id="panel-devices">
+      <div class="grant-box">
+        <div class="grant-box-title">Quick unban</div>
+        <div class="grant-box-row">
+          <input type="text" id="quickUnbanInput" placeholder="Device ID to unban" />
+          <button class="btn-sm safe" id="quickUnbanBtn" onclick="quickUnban()">Unban</button>
+        </div>
+        <div class="grant-box-hint" id="quickUnbanHint">
+          Paste a device ID directly here if you don't want to scroll/filter the table below to find its row.
+        </div>
+      </div>
+      <div class="controls-row">
+        <button class="filter-btn active" data-tier="all">All</button>
+        <button class="filter-btn" data-tier="unknown">Free / Unknown</button>
+        <button class="filter-btn" data-tier="standard">Standard</button>
+        <button class="filter-btn" data-tier="powerBrewer">Power User</button>
+        <button class="filter-btn" data-tier="ultimate">Ultimate</button>
+        <button class="filter-btn" data-tier="banned">Banned</button>
+        <select class="sort-select" id="deviceSort">
+          <option value="cost-desc">Sort: Spend (high → low)</option>
+          <option value="cost-asc">Sort: Spend (low → high)</option>
+          <option value="calls-desc">Sort: Call count</option>
+          <option value="recent">Sort: Last seen</option>
+          <option value="fairuse-desc">Sort: % Fair Use Used (high → low)</option>
+        </select>
+      </div>
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Device ID</th><th>Tier</th><th>4mo Spend</th><th>4mo Calls</th><th>% Fair Use Used (this period)</th><th>Last Seen</th><th></th>
+          </tr>
+        </thead>
+        <tbody id="devicesTableBody"><tr><td colspan="7" class="empty-note">Loading…</td></tr></tbody>
+      </table>
+      <div class="footnote">
+        "Tier" is client-reported by the app, same trust level noted throughout the backend — a modified client
+        could lie about it. Spotting a device claiming a high tier with heavy usage but never actually appearing in
+        the registered-accounts list as a real paying tier is the actual abuse signal to look for, not the tier
+        label alone. Devices seen before this tracking was added show as "Free / Unknown" until their next call.
+      </div>
+    </section>
+
+    <!-- AI CALL LOG -->
+    <section class="panel" id="panel-calls">
+      <div class="controls-row">
+        <button class="filter-btn active" data-feature="all">All features</button>
+        <button class="filter-btn" data-feature="tweak">Tweaks</button>
+        <button class="filter-btn" data-feature="generate">Generations</button>
+        <button class="filter-btn" data-feature="other">Other (kit scan, etc.)</button>
+        <input class="search-box" id="callDeviceFilter" placeholder="Filter by device ID…" oninput="renderCalls()" style="max-width:220px;" />
+      </div>
+      <div class="stat-row" id="callsStats"></div>
+      <table class="data-table">
+        <thead>
+          <tr><th>When</th><th>Device</th><th>Feature</th><th>Tier</th><th>Model</th><th>Tokens (in/out)</th><th>Est. Cost</th></tr>
+        </thead>
+        <tbody id="callsTableBody"><tr><td colspan="7" class="empty-note">Loading…</td></tr></tbody>
+      </table>
+      <div class="footnote">
+        Last 4 months, most recent 2000 calls. Each row is one AI request — "tweak" and "generate" are the two
+        allowance-metered features; everything else (kit-box scanning, conditionals, etc.) is logged for cost
+        visibility but isn't limited by the monthly tier allowance, only the flat daily anti-abuse cap.
+      </div>
+    </section>
+
+    <!-- KITS -->
+    <section class="panel" id="panel-kits">
+      <div class="controls-row">
+        <input class="search-box" id="kitSearch" placeholder="Search kits or brands…" oninput="renderKits()" />
+      </div>
+      <div id="kitsList"><div class="load-note">Loading…</div></div>
+    </section>
+
+    <!-- FEATURE SUGGESTIONS -->
+    <section class="panel" id="panel-suggestions">
+      <div id="suggestionsList"><div class="load-note">Loading…</div></div>
+    </section>
+  </main>
+</div>
+
+<div class="modal-overlay" id="banModal">
+  <div class="modal">
+    <h3 id="banModalTitle">Ban device</h3>
+    <input type="text" id="banReasonInput" placeholder="Reason (shown only to you)" />
+    <div class="modal-actions">
+      <button class="btn-sm" onclick="closeBanModal()">Cancel</button>
+      <button class="btn-sm danger" id="banConfirmBtn">Confirm ban</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const FN_URL = 'https://qrihcvanmkdsaojuhasm.supabase.co/functions/v1/admin-dashboard';
+  const KIT_LOOKUP_URL = 'https://qrihcvanmkdsaojuhasm.supabase.co/functions/v1/kit-lookup';
+  const ANON_KEY = 'sb_publishable_tFB-sh1Zh7lk0StvG9aGdw_v6LCEyck';
+
+  let SECRET = localStorage.getItem('hh_admin_secret') || '';
+  let usersData = null, devicesData = null, kitsData = null, spendData = null, callsData = null, suggestionsData = null;
+  let uptakeData = null, revenueData = null, profitData = null;
+  let deviceFilter = 'all';
+  let callFeatureFilter = 'all';
+
+  async function call(action, extra) {
+    const res = await fetch(FN_URL, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-admin-secret': SECRET },
+      body: JSON.stringify(Object.assign({ action }, extra || {})),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error((data && data.error && data.error.message) || 'Request failed');
+    return data;
+  }
+
+  document.getElementById('loginBtn').onclick = tryLogin;
+  document.getElementById('secretInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') tryLogin(); });
+
+  async function tryLogin() {
+    const val = document.getElementById('secretInput').value.trim();
+    if (!val) return;
+    SECRET = val;
+    document.getElementById('loginError').textContent = 'Checking…';
+    try {
+      await call('list_users');
+      localStorage.setItem('hh_admin_secret', SECRET);
+      document.getElementById('loginScreen').style.display = 'none';
+      document.getElementById('app').style.display = 'block';
+      refreshAll();
+    } catch (e) {
+      document.getElementById('loginError').textContent = 'Wrong secret or network error: ' + e.message;
+    }
+  }
+
+  if (SECRET) {
+    document.getElementById('secretInput').value = SECRET;
+    tryLogin();
+  }
+
+  document.querySelectorAll('.tab-btn').forEach((btn) => {
+    btn.onclick = () => {
+      document.querySelectorAll('.tab-btn').forEach((b) => b.classList.remove('active'));
+      document.querySelectorAll('.panel').forEach((p) => p.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
+    };
+  });
+
+  function fmtUsd(n) { return '$' + n.toFixed(n < 1 ? 4 : 2); }
+  function fmtDate(iso) { if (!iso) return '—'; return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }); }
+  function tierLabel(t) {
+    if (!t) return 'Free / Unknown';
+    return { standard: 'Standard', powerBrewer: 'Power User', ultimate: 'Ultimate' }[t] || t;
+  }
+  function tierPillClass(t) { return t || 'unknown'; }
+
+  async function refreshAll() {
+    await Promise.all([loadUsers(), loadDevices(), loadKits(), loadSpend(), loadCalls(), loadUptake(), loadRevenue(), loadProfit(), loadSuggestions()]);
+  }
+
+  async function loadSuggestions() {
+    try {
+      suggestionsData = (await call('list_feature_suggestions')).suggestions;
+      renderSuggestions();
+    } catch (e) { console.error(e); }
+  }
+
+  function renderSuggestions() {
+    const el = document.getElementById('suggestionsList');
+    if (!suggestionsData || !suggestionsData.length) { el.innerHTML = '<div class="load-note">No suggestions yet.</div>'; return; }
+    el.innerHTML = suggestionsData.map((s) => (
+      '<div class="kit-card">' +
+      '<div class="name">' + escapeHtml(s.suggestion) + '</div>' +
+      '<div class="meta">' + (s.email || 'unknown user') + ' · ' + fmtDate(s.createdAt) + '</div>' +
+      '</div>'
+    )).join('');
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+
+  async function loadUptake() {
+    try { uptakeData = await call('premium_uptake'); renderUptakeChart(); renderRevenueStats(); }
+    catch (e) { console.error(e); }
+  }
+  async function loadRevenue() {
+    try { revenueData = await call('revenue_summary'); renderRevenueChart(); renderRevenueStats(); }
+    catch (e) { console.error(e); }
+  }
+  async function loadProfit() {
+    try { profitData = await call('profit_loss_summary'); renderProfitChart(); renderRevenueStats(); }
+    catch (e) { console.error(e); }
+  }
+
+  function renderRevenueStats() {
+    const el = document.getElementById('revenueStats');
+    if (!el) return;
+    el.innerHTML = [
+      statCard('Current Premium Accounts', uptakeData ? uptakeData.currentPremiumCount : '—'),
+      statCard('Total Revenue (4mo)', revenueData ? fmtUsd(revenueData.totalRevenueUsd) : '—'),
+      statCard('Total AI Cost (4mo)', profitData ? fmtUsd(profitData.totalCostUsd) : '—'),
+      statCard('Net Profit / Loss (4mo)', profitData ? fmtUsd(profitData.totalProfitUsd) : '—', profitData && profitData.totalProfitUsd < 0 ? 'red' : 'green'),
+    ].join('');
+  }
+
+  function renderUptakeChart() {
+    const el = document.getElementById('uptakeChart');
+    if (!uptakeData || !uptakeData.series.length) { el.innerHTML = '<div class="load-note">No premium accounts yet.</div>'; return; }
+    const max = Math.max(...uptakeData.series.map((d) => d.cumulativePremium), 1);
+    el.innerHTML = uptakeData.series.map((d) => {
+      const h = Math.max(2, Math.round((d.cumulativePremium / max) * 150));
+      return '<div class="bar-col" style="height:150px;"><div class="tip">' + d.day + ': ' + d.cumulativePremium + ' premium accounts</div><div class="bar" style="height:' + h + 'px;"></div></div>';
+    }).join('');
+  }
+
+  function renderRevenueChart() {
+    const el = document.getElementById('revenueChart');
+    const note = document.getElementById('revenueFootnote');
+    if (note) {
+      note.textContent = revenueData && revenueData.hasAnyPayments
+        ? 'Real revenue from payment_events.'
+        : 'Genuinely $0 — no real purchases exist yet (premium is still a free placeholder toggle during testing). This chart is fully wired up and will start showing real numbers automatically once in-app purchases go live — nothing here needs rebuilding later.';
+    }
+    if (!revenueData || !revenueData.days.length) { el.innerHTML = '<div class="load-note">No revenue logged yet — see note below.</div>'; return; }
+    const max = Math.max(...revenueData.days.map((d) => d.revenueUsd), 0.0001);
+    el.innerHTML = revenueData.days.map((d) => {
+      const h = Math.max(2, Math.round((d.revenueUsd / max) * 150));
+      return '<div class="bar-col" style="height:150px;"><div class="tip">' + d.day + ': ' + fmtUsd(d.revenueUsd) + '</div><div class="bar" style="height:' + h + 'px;"></div></div>';
+    }).join('');
+  }
+
+  function renderProfitChart() {
+    const el = document.getElementById('profitChart');
+    if (!profitData || !profitData.days.length) { el.innerHTML = '<div class="load-note">No data yet.</div>'; return; }
+    const maxAbs = Math.max(...profitData.days.map((d) => Math.abs(d.profitUsd)), 0.0001);
+    el.className = 'bar-chart diverging';
+    el.innerHTML = profitData.days.map((d) => {
+      const halfPx = 75; // half of the 150px chart height
+      const h = Math.max(2, Math.round((Math.abs(d.profitUsd) / maxAbs) * halfPx));
+      const cls = d.profitUsd >= 0 ? 'profit' : 'loss';
+      const label = d.profitUsd >= 0 ? 'profit' : 'loss';
+      return '<div class="bar-col" style="height:150px;"><div class="tip">' + d.day + ': ' + fmtUsd(Math.abs(d.profitUsd)) + ' ' + label + '</div><div class="bar ' + cls + '" style="height:' + h + 'px;"></div></div>';
+    }).join('');
+  }
+
+  async function loadCalls() {
+    try {
+      callsData = (await call('device_calls')).calls;
+      renderCalls();
+    } catch (e) { console.error(e); }
+  }
+
+  async function loadUsers() {
+    try {
+      usersData = await call('list_users');
+      renderOverviewStats();
+      renderUsers();
+    } catch (e) { console.error(e); }
+  }
+
+  async function loadDevices() {
+    try {
+      devicesData = await call('list_devices');
+      renderDevices();
+    } catch (e) { console.error(e); }
+  }
+
+  async function loadSpend() {
+    try {
+      spendData = await call('spend_summary');
+      renderSpendChart();
+      renderOverviewStats();
+    } catch (e) { console.error(e); }
+  }
+
+  async function loadKits() {
+    try {
+      const res = await fetch(KIT_LOOKUP_URL, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: 'Bearer ' + ANON_KEY, 'x-device-id': 'admin-dashboard' },
+        body: JSON.stringify({ action: 'list' }),
+      });
+      const data = await res.json();
+      kitsData = data.kits || [];
+      renderKits();
+    } catch (e) { console.error(e); }
+  }
+
+  function renderOverviewStats() {
+    const el = document.getElementById('overviewStats');
+    const totalUsers = usersData ? usersData.totalUsers : '—';
+    const tc = usersData ? usersData.tierCounts : {};
+    const premiumUsers = usersData ? (totalUsers - (tc.free || 0)) : '—';
+    const last30 = spendData ? spendData.days.filter((d) => (Date.now() - new Date(d.day)) < 30 * 864e5).reduce((s, d) => s + d.costUsd, 0) : null;
+    el.innerHTML = [
+      statCard('Registered Users', totalUsers),
+      statCard('Premium Users', premiumUsers, 'green'),
+      statCard('AI Spend (30d)', last30 !== null ? fmtUsd(last30) : '—'),
+      statCard('AI Spend (this calendar month)', spendData && spendData.thisMonthUsd != null ? fmtUsd(spendData.thisMonthUsd) : '—'),
+      statCard('Standard / Power User / Ultimate', tc.standard != null ? (tc.standard + ' / ' + (tc.powerBrewer||0) + ' / ' + (tc.ultimate||0)) : '—'),
+    ].join('');
+  }
+  function statCard(label, value, cls) {
+    return '<div class="stat-card"><div class="label">' + label + '</div><div class="value ' + (cls||'') + '">' + value + '</div></div>';
+  }
+
+  function renderSpendChart() {
+    const el = document.getElementById('spendChart');
+    if (!spendData || !spendData.days.length) { el.innerHTML = '<div class="load-note">No AI usage logged yet.</div>'; return; }
+    const max = Math.max(...spendData.days.map((d) => d.costUsd), 0.0001);
+    el.innerHTML = spendData.days.map((d) => {
+      const h = Math.max(2, Math.round((d.costUsd / max) * 150));
+      return '<div class="bar-col" style="height:150px;"><div class="tip">' + d.day + ': ' + fmtUsd(d.costUsd) + '</div><div class="bar" style="height:' + h + 'px;"></div></div>';
+    }).join('');
+  }
+
+  function renderUsers() {
+    if (!usersData) return;
+    const tc = usersData.tierCounts;
+    document.getElementById('userTierStats').innerHTML = [
+      statCard('Free', tc.free || 0),
+      statCard('Standard', tc.standard || 0, 'green'),
+      statCard('Power User', tc.powerBrewer || 0, 'green'),
+      statCard('Ultimate', tc.ultimate || 0, 'green'),
+    ].join('');
+
+    const q = document.getElementById('userSearch').value.trim().toLowerCase();
+    const rows = usersData.users
+      .filter((u) => !q || (u.email || '').toLowerCase().includes(q))
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+    const body = document.getElementById('usersTableBody');
+    if (!rows.length) { body.innerHTML = '<tr><td colspan="6" class="empty-note">No matching accounts.</td></tr>'; return; }
+    body.innerHTML = rows.map((u) => (
+      '<tr>' +
+      '<td>' + (u.email || '—') + '</td>' +
+      '<td><span class="pill ' + (u.premiumEnabled ? tierPillClass(u.aiTier) : 'free') + '">' + (u.premiumEnabled ? tierLabel(u.aiTier) : 'Free') + '</span></td>' +
+      '<td>' + fmtDate(u.premiumSince) + '</td>' +
+      '<td>' + fmtDate(u.createdAt) + '</td>' +
+      '<td>' + fmtDate(u.lastSignInAt) + '</td>' +
+      '<td>' + (u.email
+        ? (u.premiumEnabled
+            ? '<button class="btn-sm danger" onclick="cancelPremium(' + JSON.stringify(u.email) + ')">Cancel premium</button>'
+            : '<button class="btn-sm safe" onclick="quickGrant(' + JSON.stringify(u.email) + ')">Grant premium</button>')
+        : '') + '</td>' +
+      '</tr>'
+    )).join('');
+  }
+
+  function quickGrant(email) {
+    document.getElementById('grantEmailInput').value = email;
+    document.getElementById('grantEmailInput').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    document.getElementById('grantEmailInput').focus();
+  }
+
+  async function grantPremiumFromBox() {
+    const email = document.getElementById('grantEmailInput').value.trim();
+    const tier = document.getElementById('grantTierSelect').value;
+    const hint = document.getElementById('grantBoxHint');
+    if (!email) { hint.textContent = 'Enter an account email first.'; hint.className = 'grant-box-hint error'; return; }
+    try {
+      await call('grant_premium', { email, tier });
+      hint.textContent = 'Granted ' + tierLabel(tier) + ' to ' + email + '. It applies next time they open the app.';
+      hint.className = 'grant-box-hint success';
+      document.getElementById('grantEmailInput').value = '';
+      await loadUsers();
+    } catch (e) {
+      hint.textContent = 'Failed: ' + e.message;
+      hint.className = 'grant-box-hint error';
+    }
+  }
+
+  async function cancelPremium(email) {
+    if (!confirm('Cancel premium for ' + email + '? Their device will not be banned — they just go back to the free tier next time they open the app.')) return;
+    try {
+      await call('cancel_premium', { email });
+      await loadUsers();
+    } catch (e) { alert('Failed to cancel: ' + e.message); }
+  }
+
+  document.querySelectorAll('[data-tier]').forEach((btn) => {
+    btn.onclick = () => {
+      document.querySelectorAll('[data-tier]').forEach((b) => b.classList.remove('active'));
+      btn.classList.add('active');
+      deviceFilter = btn.dataset.tier;
+      renderDevices();
+    };
+  });
+  document.getElementById('deviceSort').onchange = renderDevices;
+
+  function renderDevices() {
+    if (!devicesData) return;
+    let rows = devicesData.devices.slice();
+
+    if (deviceFilter === 'banned') rows = rows.filter((d) => d.banned);
+    else if (deviceFilter === 'unknown') rows = rows.filter((d) => !d.lastReportedTier);
+    else if (deviceFilter !== 'all') rows = rows.filter((d) => d.lastReportedTier === deviceFilter);
+
+    const sort = document.getElementById('deviceSort').value;
+    if (sort === 'cost-desc') rows.sort((a, b) => b.rolling4moCostUsd - a.rolling4moCostUsd);
+    else if (sort === 'cost-asc') rows.sort((a, b) => a.rolling4moCostUsd - b.rolling4moCostUsd);
+    else if (sort === 'calls-desc') rows.sort((a, b) => b.rolling4moCallCount - a.rolling4moCallCount);
+    else if (sort === 'recent') rows.sort((a, b) => new Date(b.lastSeenAt || 0) - new Date(a.lastSeenAt || 0));
+    else if (sort === 'fairuse-desc') rows.sort((a, b) => (b.fairUseUsedPct ?? -1) - (a.fairUseUsedPct ?? -1));
+
+    const body = document.getElementById('devicesTableBody');
+    if (!rows.length) { body.innerHTML = '<tr><td colspan="7" class="empty-note">No devices match this filter.</td></tr>'; return; }
+    body.innerHTML = rows.map((d) => (
+      '<tr>' +
+      '<td class="mono">' + d.deviceId + '</td>' +
+      '<td>' + (d.banned ? '<span class="pill banned">BANNED</span>' : '<span class="pill ' + tierPillClass(d.lastReportedTier) + '">' + tierLabel(d.lastReportedTier) + '</span>') + '</td>' +
+      '<td>' + fmtUsd(d.rolling4moCostUsd) + '</td>' +
+      '<td>' + d.rolling4moCallCount + '</td>' +
+      '<td>' + fairUsePctCell(d) + '</td>' +
+      '<td>' + fmtDate(d.lastSeenAt) + '</td>' +
+      '<td>' + (d.banned
+        ? '<button class="btn-sm safe" onclick="unbanDevice(\'' + d.deviceId + '\')">Unban</button>'
+        : '<button class="btn-sm danger" onclick="openBanModal(\'' + d.deviceId + '\')">Ban</button>') + '</td>' +
+      '</tr>'
+    )).join('');
+  }
+
+  function fairUsePctCell(d) {
+    if (d.fairUseUsedPct === null || d.fairUseUsedPct === undefined) return '<span class="load-note" style="padding:0;">—</span>';
+    const pct = Math.min(999, d.fairUseUsedPct);
+    const cls = pct >= 100 ? 'red' : pct >= 80 ? 'amber' : 'green';
+    return '<span class="pct-bar"><span class="pct-fill ' + cls + '" style="width:' + Math.min(100, pct) + '%;"></span></span>' +
+      '<span class="pct-label">' + pct + '% (' + fmtUsd(d.currentPeriodSpendUsd) + ' / ' + fmtUsd(d.fairUseBudgetUsd) + ')</span>';
+  }
+
+  let banTargetDeviceId = null;
+  function openBanModal(deviceId) {
+    banTargetDeviceId = deviceId;
+    document.getElementById('banModalTitle').textContent = 'Ban device ' + deviceId.slice(0, 12) + '…';
+    document.getElementById('banReasonInput').value = '';
+    document.getElementById('banModal').classList.add('active');
+  }
+  function closeBanModal() {
+    document.getElementById('banModal').classList.remove('active');
+    banTargetDeviceId = null;
+  }
+  document.getElementById('banConfirmBtn').onclick = async () => {
+    if (!banTargetDeviceId) return;
+    const reason = document.getElementById('banReasonInput').value.trim() || 'Unspecified';
+    try {
+      await call('ban_device', { deviceId: banTargetDeviceId, reason });
+      closeBanModal();
+      await loadDevices();
+    } catch (e) { alert('Failed to ban: ' + e.message); }
+  };
+  async function unbanDevice(deviceId) {
+    if (!confirm('Unban this device?')) return;
+    try {
+      await call('unban_device', { deviceId });
+      await loadDevices();
+    } catch (e) { alert('Failed to unban: ' + e.message); }
+  }
+
+  async function quickUnban() {
+    const deviceId = document.getElementById('quickUnbanInput').value.trim();
+    const hint = document.getElementById('quickUnbanHint');
+    if (!deviceId) { hint.textContent = 'Enter a device ID first.'; hint.className = 'grant-box-hint error'; return; }
+    try {
+      await call('unban_device', { deviceId });
+      hint.textContent = 'Unbanned ' + deviceId + '.';
+      hint.className = 'grant-box-hint success';
+      document.getElementById('quickUnbanInput').value = '';
+      await loadDevices();
+    } catch (e) {
+      hint.textContent = 'Failed: ' + e.message;
+      hint.className = 'grant-box-hint error';
+    }
+  }
+
+  document.querySelectorAll('[data-feature]').forEach((btn) => {
+    btn.onclick = () => {
+      document.querySelectorAll('[data-feature]').forEach((b) => b.classList.remove('active'));
+      btn.classList.add('active');
+      callFeatureFilter = btn.dataset.feature;
+      renderCalls();
+    };
+  });
+
+  function renderCalls() {
+    if (!callsData) return;
+    const deviceQ = document.getElementById('callDeviceFilter').value.trim().toLowerCase();
+    let rows = callsData.slice();
+    if (callFeatureFilter === 'other') rows = rows.filter((c) => !c.feature);
+    else if (callFeatureFilter !== 'all') rows = rows.filter((c) => c.feature === callFeatureFilter);
+    if (deviceQ) rows = rows.filter((c) => c.device_id.toLowerCase().includes(deviceQ));
+
+    const totalCost = rows.reduce((s, c) => s + (Number(c.estimated_cost_usd) || 0), 0);
+    const byFeatureCount = {};
+    rows.forEach((c) => { const k = c.feature || 'other'; byFeatureCount[k] = (byFeatureCount[k] || 0) + 1; });
+    document.getElementById('callsStats').innerHTML = [
+      statCard('Calls shown', rows.length),
+      statCard('Est. cost (shown)', fmtUsd(totalCost)),
+      statCard('Tweaks', byFeatureCount.tweak || 0),
+      statCard('Generations', byFeatureCount.generate || 0),
+    ].join('');
+
+    const body = document.getElementById('callsTableBody');
+    if (!rows.length) { body.innerHTML = '<tr><td colspan="7" class="empty-note">No calls match this filter.</td></tr>'; return; }
+    body.innerHTML = rows.slice(0, 500).map((c) => (
+      '<tr>' +
+      '<td>' + new Date(c.created_at).toLocaleString() + '</td>' +
+      '<td class="mono">' + c.device_id.slice(0, 14) + '…</td>' +
+      '<td>' + (c.feature || 'other') + '</td>' +
+      '<td><span class="pill ' + tierPillClass(c.tier) + '">' + tierLabel(c.tier) + '</span></td>' +
+      '<td class="mono">' + c.model + '</td>' +
+      '<td>' + c.input_tokens + ' / ' + c.output_tokens + '</td>' +
+      '<td>' + fmtUsd(Number(c.estimated_cost_usd) || 0) + '</td>' +
+      '</tr>'
+    )).join('') + (rows.length > 500 ? '<tr><td colspan="7" class="empty-note">Showing first 500 of ' + rows.length + ' matching calls.</td></tr>' : '');
+  }
+
+  function renderKits() {
+    if (!kitsData) return;
+    const q = document.getElementById('kitSearch').value.trim().toLowerCase();
+    const rows = kitsData.filter((k) => !q || k.name.toLowerCase().includes(q) || (k.brand || '').toLowerCase().includes(q));
+    const el = document.getElementById('kitsList');
+    if (!rows.length) { el.innerHTML = '<div class="empty-note">No kits in the shared database yet.</div>'; return; }
+    el.innerHTML = rows.map((k) => (
+      '<div class="kit-card"><div class="name">' + (k.brand ? k.brand + ' — ' + k.name : k.name) + '</div>' +
+      '<div class="meta">' + (k.style ? k.style + ' · ' : '') + 'Confirmed ' + k.matchCount + 'x · Updated ' + fmtDate(k.updatedAt) + '</div></div>'
+    )).join('');
+  }
+</script>
+</body>
+</html>
