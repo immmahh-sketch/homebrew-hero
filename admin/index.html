@@ -264,6 +264,9 @@
   .pill.ultimate { background: rgba(76,175,125,0.18); color: var(--green); }
   .pill.banned { background: rgba(224,96,79,0.18); color: var(--red); }
   .pill.unknown { background: rgba(168,152,124,0.1); color: var(--muted); }
+  .pill.active { background: rgba(76,175,125,0.18); color: var(--green); }
+  .pill.quiet { background: rgba(227,165,66,0.18); color: var(--amber); }
+  .pill.stale { background: rgba(224,96,79,0.18); color: var(--red); }
 
   .btn-sm {
     background: var(--bg-panel-2);
@@ -356,6 +359,7 @@
     <button class="tab-btn" data-tab="kits">Recognized Kits</button>
     <button class="tab-btn" data-tab="suggestions">Feature Suggestions</button>
     <button class="tab-btn" data-tab="testers">Tester Applications</button>
+    <button class="tab-btn" data-tab="qrscans">QR Scans</button>
   </nav>
 
   <main>
@@ -540,6 +544,29 @@
         <tbody id="testersBody"><tr><td colspan="10" class="empty-note">Loading…</td></tr></tbody>
       </table>
     </section>
+
+    <!-- QR SCANS -->
+    <section class="panel" id="panel-qrscans">
+      <p class="load-note" style="margin-bottom:14px;">
+        Each row is a distinct printed QR code (identified by the ?src= tag baked into that piece's
+        QR image), logged whenever it's scanned and redirected to the site. A source with no scans in
+        7+ days after previously scanning regularly may mean that print run stopped going out — worth
+        a nudge to whoever's distributing it.
+      </p>
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Source</th>
+            <th>Total scans</th>
+            <th>Last 7 days</th>
+            <th>Last 30 days</th>
+            <th>Last scan</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="qrScansBody"><tr><td colspan="6" class="empty-note">Loading…</td></tr></tbody>
+      </table>
+    </section>
   </main>
 </div>
 
@@ -560,7 +587,7 @@
   const ANON_KEY = 'sb_publishable_tFB-sh1Zh7lk0StvG9aGdw_v6LCEyck';
 
   let SECRET = localStorage.getItem('hh_admin_secret') || '';
-  let usersData = null, devicesData = null, kitsData = null, spendData = null, callsData = null, suggestionsData = null, testersData = null;
+  let usersData = null, devicesData = null, kitsData = null, spendData = null, callsData = null, suggestionsData = null, testersData = null, qrScansData = null;
   let uptakeData = null, revenueData = null, profitData = null;
   let deviceFilter = 'all';
   let callFeatureFilter = 'all';
@@ -618,7 +645,38 @@
   function tierPillClass(t) { return t || 'unknown'; }
 
   async function refreshAll() {
-    await Promise.all([loadUsers(), loadDevices(), loadKits(), loadSpend(), loadCalls(), loadUptake(), loadRevenue(), loadProfit(), loadSuggestions(), loadTesters()]);
+    await Promise.all([loadUsers(), loadDevices(), loadKits(), loadSpend(), loadCalls(), loadUptake(), loadRevenue(), loadProfit(), loadSuggestions(), loadTesters(), loadQrScans()]);
+  }
+
+  async function loadQrScans() {
+    try {
+      qrScansData = (await call('list_qr_scans')).sources;
+      renderQrScans();
+    } catch (e) { console.error(e); }
+  }
+
+  function renderQrScans() {
+    const body = document.getElementById('qrScansBody');
+    if (!qrScansData || !qrScansData.length) { body.innerHTML = '<tr><td colspan="6" class="empty-note">No scans yet.</td></tr>'; return; }
+    const sorted = [...qrScansData].sort((a, b) => new Date(b.lastScanAt) - new Date(a.lastScanAt));
+    body.innerHTML = sorted.map((s) => {
+      const daysSince = (Date.now() - new Date(s.lastScanAt).getTime()) / 86400000;
+      const status = daysSince > 14
+        ? { cls: 'stale', label: 'Gone quiet' }
+        : daysSince > 7
+          ? { cls: 'quiet', label: 'Slowing down' }
+          : { cls: 'active', label: 'Active' };
+      return (
+        '<tr>' +
+        '<td>' + escapeHtml(s.source) + '</td>' +
+        '<td>' + s.total + '</td>' +
+        '<td>' + s.last7d + '</td>' +
+        '<td>' + s.last30d + '</td>' +
+        '<td>' + fmtDate(s.lastScanAt) + '</td>' +
+        '<td><span class="pill ' + status.cls + '">' + status.label + '</span></td>' +
+        '</tr>'
+      );
+    }).join('');
   }
 
   async function loadTesters() {
