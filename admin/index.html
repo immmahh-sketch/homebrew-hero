@@ -374,12 +374,23 @@
     <button class="tab-btn" data-tab="suggestions">Feature Suggestions</button>
     <button class="tab-btn" data-tab="testers">Tester Applications</button>
     <button class="tab-btn" data-tab="qrscans">QR Scans</button>
+    <button class="tab-btn" data-tab="winback">Win-back Offers</button>
   </nav>
 
   <main>
     <!-- OVERVIEW -->
     <section class="panel active" id="panel-overview">
       <div class="stat-row" id="overviewStats"></div>
+
+      <h2 class="section-title">Growth — last 30 days</h2>
+      <div class="stat-row" id="growthStats"></div>
+      <div class="footnote" style="margin-bottom:22px;">
+        "New upgrades" counts any account whose tier changed to that tier in the last 30 days — premiumSince is bumped
+        on every tier change, not only the first purchase, so this is "moved to this tier recently," not a strict
+        first-time-upgrade count. "Inactive, free" is the pool winback-processor's daily job emails a one-time 50%-off
+        offer to (see Win-back Offers tab) — free accounts that have never gone premium and haven't opened the app in
+        30+ days, or never recorded an open at all.
+      </div>
 
       <h2 class="section-title">AI spend — last 4 months, by day</h2>
       <div class="chart-wrap">
@@ -581,6 +592,43 @@
         <tbody id="qrScansBody"><tr><td colspan="6" class="empty-note">Loading…</td></tr></tbody>
       </table>
     </section>
+
+    <!-- WIN-BACK OFFERS -->
+    <section class="panel" id="panel-winback">
+      <div class="stat-row" id="winbackStats"></div>
+
+      <h2 class="section-title">Testing → launch switch</h2>
+      <div class="kit-card" id="appConfigCard">
+        <div class="load-note">Loading…</div>
+      </div>
+      <div class="footnote" style="margin-bottom:22px;">
+        While ON, every new sign-in gets a free 6-month Power User grant (the closed-testing allowance). Existing
+        testers who already have their grant keep it regardless of this switch. Turn OFF once ready to open to real
+        signups — the same app build then serves real customers with the real paywall, no rebuild needed.
+      </div>
+
+      <h2 class="section-title">Automated win-back offers</h2>
+      <p class="load-note" style="margin-bottom:14px;">
+        Sent automatically once a day by winback-processor: 50% off 1 month to free accounts inactive 30+ days
+        (never upgraded), and 50% off 6 months 5 days after someone cancels Premium. Each account can only ever
+        receive a given offer type once — see migration 0030's unique constraint. Redemption itself isn't wired up
+        yet (no real billing to discount against), so "Redeemed" will stay empty until that lands.
+      </p>
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Sent</th>
+            <th>Email</th>
+            <th>Offer</th>
+            <th>Discount</th>
+            <th>Expires</th>
+            <th>Status</th>
+            <th>Redeemed</th>
+          </tr>
+        </thead>
+        <tbody id="winbackBody"><tr><td colspan="7" class="empty-note">Loading…</td></tr></tbody>
+      </table>
+    </section>
   </main>
 </div>
 
@@ -601,7 +649,7 @@
   const ANON_KEY = 'sb_publishable_tFB-sh1Zh7lk0StvG9aGdw_v6LCEyck';
 
   let SECRET = localStorage.getItem('hh_admin_secret') || '';
-  let usersData = null, devicesData = null, kitsData = null, spendData = null, callsData = null, suggestionsData = null, testersData = null, qrScansData = null;
+  let usersData = null, devicesData = null, kitsData = null, spendData = null, callsData = null, suggestionsData = null, testersData = null, qrScansData = null, growthData = null, winbackData = null, appConfigData = null;
   let uptakeData = null, revenueData = null, profitData = null;
   let deviceFilter = 'all';
   let callFeatureFilter = 'all';
@@ -659,7 +707,7 @@
   function tierPillClass(t) { return t || 'unknown'; }
 
   async function refreshAll() {
-    await Promise.all([loadUsers(), loadDevices(), loadKits(), loadSpend(), loadCalls(), loadUptake(), loadRevenue(), loadProfit(), loadSuggestions(), loadTesters(), loadQrScans()]);
+    await Promise.all([loadUsers(), loadDevices(), loadKits(), loadSpend(), loadCalls(), loadUptake(), loadRevenue(), loadProfit(), loadSuggestions(), loadTesters(), loadQrScans(), loadGrowthStats(), loadWinbackOffers(), loadAppConfig()]);
   }
 
   async function loadQrScans() {
@@ -691,6 +739,82 @@
         '</tr>'
       );
     }).join('');
+  }
+
+  async function loadWinbackOffers() {
+    try {
+      winbackData = await call('list_winback_offers');
+      renderWinbackOffers();
+    } catch (e) { console.error(e); }
+  }
+
+  function renderWinbackOffers() {
+    const statsEl = document.getElementById('winbackStats');
+    const body = document.getElementById('winbackBody');
+    if (!winbackData) { statsEl.innerHTML = ''; body.innerHTML = '<tr><td colspan="7" class="empty-note">Loading…</td></tr>'; return; }
+
+    statsEl.innerHTML = [
+      statCard('Offers Sent (all time)', winbackData.totalSent),
+      statCard('Redeemed', winbackData.redeemedCount, winbackData.redeemedCount > 0 ? 'green' : ''),
+    ].join('');
+
+    if (!winbackData.offers.length) { body.innerHTML = '<tr><td colspan="7" class="empty-note">No offers sent yet.</td></tr>'; return; }
+    const offerLabel = { inactivity_winback: 'Inactivity', cancellation_winback: 'Cancellation' };
+    body.innerHTML = winbackData.offers.map((o) => {
+      const status = o.redeemedAt
+        ? { cls: 'active', label: 'Redeemed' }
+        : o.emailError
+          ? { cls: 'stale', label: 'Send failed' }
+          : o.emailSentAt
+            ? (new Date(o.expiresAt) < new Date() ? { cls: 'quiet', label: 'Expired' } : { cls: 'unknown', label: 'Sent' })
+            : { cls: 'unknown', label: 'Pending' };
+      return (
+        '<tr>' +
+        '<td>' + (o.emailSentAt ? fmtDate(o.emailSentAt) : '—') + '</td>' +
+        '<td>' + escapeHtml(o.email || '—') + '</td>' +
+        '<td>' + (offerLabel[o.offerType] || o.offerType) + '</td>' +
+        '<td>' + o.discountPercent + '% / ' + o.durationMonths + 'mo</td>' +
+        '<td>' + fmtDate(o.expiresAt) + '</td>' +
+        '<td><span class="pill ' + status.cls + '">' + status.label + '</span>' +
+        (o.emailError ? '<div class="footnote" style="margin-top:4px;">' + escapeHtml(o.emailError) + '</div>' : '') +
+        '</td>' +
+        '<td>' + (o.redeemedAt ? fmtDate(o.redeemedAt) : '—') + '</td>' +
+        '</tr>'
+      );
+    }).join('');
+  }
+
+  async function loadAppConfig() {
+    try {
+      appConfigData = await call('get_app_config');
+      renderAppConfig();
+    } catch (e) { console.error(e); }
+  }
+
+  function renderAppConfig() {
+    const el = document.getElementById('appConfigCard');
+    if (!appConfigData) { el.innerHTML = '<div class="load-note">Loading…</div>'; return; }
+    const on = appConfigData.testerAutoGrantEnabled;
+    el.innerHTML =
+      '<div style="display:flex; align-items:center; justify-content:space-between;">' +
+      '<div>' +
+      '<div class="name">Closed-testing auto-grant is <span class="pill ' + (on ? 'active' : 'stale') + '">' + (on ? 'ON' : 'OFF') + '</span></div>' +
+      '<div class="meta">' + (on ? 'New sign-ins get a free 6-month Power User grant.' : 'New sign-ins hit the real paywall — testing auto-grant is closed.') + '</div>' +
+      '</div>' +
+      '<button class="btn-sm ' + (on ? 'danger' : 'safe') + '" onclick="toggleTesterAutoGrant()">' + (on ? 'Turn OFF (launch)' : 'Turn ON (testing)') + '</button>' +
+      '</div>';
+  }
+
+  async function toggleTesterAutoGrant() {
+    if (!appConfigData) return;
+    const next = !appConfigData.testerAutoGrantEnabled;
+    const verb = next ? 'turn the auto-grant back ON (testing mode)' : 'turn the auto-grant OFF — every new sign-in from now on hits the real paywall instead of a free 6-month grant';
+    if (!confirm('Are you sure you want to ' + verb + '?')) return;
+    try {
+      await call('set_app_config', { testerAutoGrantEnabled: next });
+      appConfigData.testerAutoGrantEnabled = next;
+      renderAppConfig();
+    } catch (e) { alert('Failed: ' + e.message); }
   }
 
   async function loadTesters() {
@@ -885,6 +1009,25 @@
   }
   function statCard(label, value, cls) {
     return '<div class="stat-card"><div class="label">' + label + '</div><div class="value ' + (cls||'') + '">' + value + '</div></div>';
+  }
+
+  async function loadGrowthStats() {
+    try {
+      growthData = await call('growth_stats');
+      renderGrowthStats();
+    } catch (e) { console.error(e); }
+  }
+
+  function renderGrowthStats() {
+    const el = document.getElementById('growthStats');
+    if (!growthData) { el.innerHTML = '<div class="load-note">Loading…</div>'; return; }
+    const u = growthData.newUpgrades30d || {};
+    el.innerHTML = [
+      statCard('New Accounts', growthData.newAccounts30d, 'green'),
+      statCard('New Upgrades — Standard / Power User / Ultimate', (u.standard||0) + ' / ' + (u.powerBrewer||0) + ' / ' + (u.ultimate||0), 'green'),
+      statCard('Lapsed Premium', growthData.newLapsed30d, growthData.newLapsed30d > 0 ? 'red' : ''),
+      statCard('Inactive, Free (winback pool)', growthData.inactiveNeverUpgraded),
+    ].join('');
   }
 
   function renderSpendChart() {
