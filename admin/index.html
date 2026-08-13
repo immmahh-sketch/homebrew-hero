@@ -326,6 +326,28 @@
   .modal .modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
 
   .footnote { color: var(--muted); font-size: 11.5px; margin-top: 10px; line-height: 1.5; }
+  .kill-switch-banner {
+    background: rgba(224,96,79,0.1);
+    border: 1px solid rgba(224,96,79,0.4);
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-bottom: 18px;
+  }
+  .kill-switch-banner-title { font-size: 13px; font-weight: 700; color: var(--red); margin-bottom: 10px; }
+  .kill-switch-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 8px 0; border-top: 1px solid rgba(224,96,79,0.2);
+  }
+  .kill-switch-row:first-of-type { border-top: none; }
+  .kill-switch-row .meta { font-size: 12.5px; color: var(--ink); line-height: 1.5; }
+  .kill-switch-row .meta .mono { color: var(--muted); }
+  .kill-switch-row .actions { display: flex; gap: 6px; flex-shrink: 0; }
+  .tab-badge {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 16px; height: 16px; padding: 0 4px; margin-left: 5px;
+    background: var(--red); color: #fff; border-radius: 8px;
+    font-size: 10px; font-weight: 700; vertical-align: 2px;
+  }
 
   .notes-cell { max-width: 360px; min-width: 360px; white-space: normal; }
   .notes-text {
@@ -368,7 +390,7 @@
     <button class="tab-btn active" data-tab="overview">Overview</button>
     <button class="tab-btn" data-tab="revenue">Revenue &amp; Profit</button>
     <button class="tab-btn" data-tab="users">Registered Accounts</button>
-    <button class="tab-btn" data-tab="devices">Devices &amp; AI Spend</button>
+    <button class="tab-btn" data-tab="devices">Devices &amp; AI Spend<span class="tab-badge" id="killSwitchTabBadge" style="display:none;"></span></button>
     <button class="tab-btn" data-tab="calls">AI Call Log</button>
     <button class="tab-btn" data-tab="kits">Recognized Kits</button>
     <button class="tab-btn" data-tab="suggestions">Feature Suggestions</button>
@@ -380,6 +402,7 @@
   <main>
     <!-- OVERVIEW -->
     <section class="panel active" id="panel-overview">
+      <div id="killSwitchBanner"></div>
       <div class="stat-row" id="overviewStats"></div>
 
       <h2 class="section-title">Growth — last 30 days</h2>
@@ -649,7 +672,7 @@
   const ANON_KEY = 'sb_publishable_tFB-sh1Zh7lk0StvG9aGdw_v6LCEyck';
 
   let SECRET = localStorage.getItem('hh_admin_secret') || '';
-  let usersData = null, devicesData = null, kitsData = null, spendData = null, callsData = null, suggestionsData = null, testersData = null, qrScansData = null, growthData = null, winbackData = null, appConfigData = null;
+  let usersData = null, devicesData = null, kitsData = null, spendData = null, callsData = null, suggestionsData = null, testersData = null, qrScansData = null, growthData = null, winbackData = null, appConfigData = null, killSwitchData = null;
   let uptakeData = null, revenueData = null, profitData = null;
   let deviceFilter = 'all';
   let callFeatureFilter = 'all';
@@ -707,7 +730,7 @@
   function tierPillClass(t) { return t || 'unknown'; }
 
   async function refreshAll() {
-    await Promise.all([loadUsers(), loadDevices(), loadKits(), loadSpend(), loadCalls(), loadUptake(), loadRevenue(), loadProfit(), loadSuggestions(), loadTesters(), loadQrScans(), loadGrowthStats(), loadWinbackOffers(), loadAppConfig()]);
+    await Promise.all([loadUsers(), loadDevices(), loadKits(), loadSpend(), loadCalls(), loadUptake(), loadRevenue(), loadProfit(), loadSuggestions(), loadTesters(), loadQrScans(), loadGrowthStats(), loadWinbackOffers(), loadAppConfig(), loadKillSwitchAlerts()]);
   }
 
   async function loadQrScans() {
@@ -1028,6 +1051,71 @@
       statCard('Lapsed Premium', growthData.newLapsed30d, growthData.newLapsed30d > 0 ? 'red' : ''),
       statCard('Inactive, Free (winback pool)', growthData.inactiveNeverUpgraded),
     ].join('');
+  }
+
+  async function loadKillSwitchAlerts() {
+    try {
+      killSwitchData = await call('list_kill_switch_alerts');
+      renderKillSwitchAlerts();
+    } catch (e) { console.error(e); }
+  }
+
+  function renderKillSwitchAlerts() {
+    const badge = document.getElementById('killSwitchTabBadge');
+    const banner = document.getElementById('killSwitchBanner');
+    if (!killSwitchData) return;
+    const unacked = killSwitchData.alerts.filter((a) => !a.acknowledged_at);
+
+    if (unacked.length) {
+      badge.textContent = unacked.length;
+      badge.style.display = 'inline-flex';
+    } else {
+      badge.style.display = 'none';
+    }
+
+    if (!unacked.length) { banner.innerHTML = ''; return; }
+    banner.innerHTML =
+      '<div class="kill-switch-banner">' +
+      '<div class="kill-switch-banner-title">⚠ AI kill switch — ' + unacked.length + ' device' + (unacked.length === 1 ? '' : 's') + ' auto-banned, needs review</div>' +
+      unacked.map((a) => (
+        '<div class="kill-switch-row">' +
+        '<div class="meta"><span class="mono">' + a.device_id + '</span> — ' + tierLabel(a.tier) +
+        ' — spent ' + fmtUsd(a.daily_cost_usd) + ' in one day (limit ' + fmtUsd(a.threshold_usd) + ')' +
+        ' — ' + fmtDate(a.triggered_at) + '</div>' +
+        '<div class="actions">' +
+        '<button class="btn-sm" onclick="jumpToDevice(\'' + a.device_id + '\')">Investigate</button>' +
+        '<button class="btn-sm safe" onclick="unbanFromAlert(' + JSON.stringify(a.id) + ', \'' + a.device_id + '\')">Unban</button>' +
+        '<button class="btn-sm danger" onclick="acknowledgeKillSwitchAlert(' + JSON.stringify(a.id) + ')">Acknowledge (keep banned)</button>' +
+        '</div></div>'
+      )).join('') +
+      '<div class="footnote">Acknowledging just clears it from this banner — it does NOT unban the device. Use Unban above if you\'ve checked it out and it\'s a false positive.</div>' +
+      '</div>';
+  }
+
+  function jumpToDevice(deviceId) {
+    document.querySelector('.tab-btn[data-tab="devices"]').click();
+    document.querySelectorAll('[data-tier]').forEach((b) => b.classList.remove('active'));
+    document.querySelector('[data-tier="banned"]').classList.add('active');
+    deviceFilter = 'banned';
+    renderDevices();
+    document.getElementById('quickUnbanInput').value = deviceId;
+    document.getElementById('quickUnbanInput').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
+  async function acknowledgeKillSwitchAlert(id) {
+    try {
+      await call('acknowledge_kill_switch_alert', { id });
+      await loadKillSwitchAlerts();
+    } catch (e) { alert('Failed to acknowledge: ' + e.message); }
+  }
+
+  async function unbanFromAlert(id, deviceId) {
+    if (!confirm('Unban ' + deviceId + '? This also acknowledges the alert.')) return;
+    try {
+      await call('unban_device', { deviceId });
+      await call('acknowledge_kill_switch_alert', { id });
+      await Promise.all([loadDevices(), loadKillSwitchAlerts()]);
+    } catch (e) { alert('Failed to unban: ' + e.message); }
   }
 
   function renderSpendChart() {
