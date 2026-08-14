@@ -207,5 +207,6 @@
   });
 </script>
 
+<script>(function(){var u="https://qrihcvanmkdsaojuhasm.supabase.co/functions/v1/track-visit";var d=JSON.stringify({path:location.pathname,referrer:document.referrer||null});if(navigator.sendBeacon){navigator.sendBeacon(u,new Blob([d],{type:"application/json"}));}else{fetch(u,{method:"POST",headers:{"Content-Type":"application/json"},body:d,keepalive:true}).catch(function(){});}})();</script>
 </body>
 </html>
