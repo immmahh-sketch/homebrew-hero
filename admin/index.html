@@ -12,7 +12,6 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="apple-mobile-web-app-title" content="HH Admin" />
-<script>if(location.hostname==="immmahh-sketch.github.io"){location.replace("https://homebrewhero.app"+location.pathname.replace(/^/homebrew-hero/,"")+location.search+location.hash);}</script>
 <style>
   :root {
     --bg: #14100B;
@@ -71,7 +70,7 @@
 
   #app { display: none; }
   header.top {
-    padding: 18px 26px;
+    padding: 14px 16px;
     border-bottom: 1px solid var(--border);
     display: flex;
     align-items: center;
@@ -81,33 +80,107 @@
   }
   header.top h1 {
     font-family: Georgia, serif;
-    font-size: 19px;
+    font-size: 17px;
     margin: 0;
     color: var(--amber);
   }
-  header.top .sub { color: var(--muted); font-size: 12px; }
-
-  nav.tabs {
-    display: flex;
-    gap: 4px;
-    padding: 0 26px;
-    border-bottom: 1px solid var(--border);
-    overflow-x: auto;
+  header.top .sub { color: var(--muted); font-size: 11.5px; }
+  @media (min-width: 720px) {
+    header.top { padding: 18px 26px; }
+    header.top h1 { font-size: 19px; }
+    header.top .sub { font-size: 12px; }
   }
-  nav.tabs button {
+
+  /* Grouped drawer nav -- a single always-visible toggle showing the current
+     section, opening a full-width dropdown of tabs grouped under category
+     labels. Designed mobile-first (this dashboard's real usage is a phone
+     home-screen PWA, see the apple-mobile-web-app meta tags above) rather
+     than as a horizontal-scrolling strip of 14 flat tabs, which stopped
+     being readable once Forum/Recipe Board/Blocked Usernames were added. */
+  .tabs-nav {
+    position: relative;
+    border-bottom: 1px solid var(--border);
+  }
+  .menu-toggle {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--bg-panel);
+    border: none;
+    color: var(--ink);
+    padding: 13px 16px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    text-align: left;
+  }
+  .menu-toggle-icon { color: var(--amber); font-size: 15px; }
+  .menu-toggle-badge {
+    background: var(--red);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 1px 7px;
+    border-radius: 999px;
+    margin-left: auto;
+  }
+  .tabs-drawer {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 20;
+    background: var(--bg-panel);
+    border-bottom: 1px solid var(--border);
+    max-height: 75vh;
+    overflow-y: auto;
+    box-shadow: 0 12px 24px rgba(0,0,0,0.4);
+  }
+  .tabs-drawer.open { display: block; }
+  .tabs-drawer-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.4);
+    z-index: 19;
+  }
+  .tabs-drawer-backdrop.open { display: block; }
+  .tab-group { padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .tab-group:last-child { border-bottom: none; }
+  .tab-group-label {
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 4px 18px;
+  }
+  .tabs-drawer .tab-btn {
+    display: block;
+    width: 100%;
+    text-align: left;
     background: none;
     border: none;
-    color: var(--muted);
-    padding: 12px 16px;
-    font-size: 13.5px;
-    font-weight: 600;
+    color: var(--ink);
+    padding: 11px 18px;
+    font-size: 14.5px;
     cursor: pointer;
-    border-bottom: 2px solid transparent;
-    white-space: nowrap;
   }
-  nav.tabs button.active { color: var(--ink); border-bottom-color: var(--amber); }
+  .tabs-drawer .tab-btn.active { color: var(--amber); font-weight: 700; background: var(--bg-panel-2); }
+  .tabs-drawer .tab-btn:active { background: var(--bg-panel-2); }
 
-  main { padding: 22px 26px 60px; max-width: 1200px; margin: 0 auto; }
+  main { padding: 18px 16px 60px; max-width: 720px; margin: 0 auto; }
+  @media (min-width: 720px) {
+    main { padding: 22px 26px 60px; }
+  }
+
+  /* Every data table scrolls horizontally within its own box instead of
+     blowing out the page width -- setting the table itself to a block box
+     is enough; rows/cells keep their normal table layout inside it. */
+  table.data-table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  table.data-table > thead, table.data-table > tbody { display: table; width: 100%; }
   .panel { display: none; }
   .panel.active { display: block; }
 
@@ -124,6 +197,9 @@
   .stat-card .value { font-size: 24px; font-weight: 700; font-family: Georgia, serif; }
   .stat-card .value.green { color: var(--green); }
   .stat-card .value.red { color: var(--red); }
+  .stat-card.clickable { cursor: pointer; transition: border-color 0.15s; }
+  .stat-card.clickable:hover { border-color: var(--amber-deep); }
+  .stat-card.clickable.active { border-color: var(--amber); background: var(--bg-panel-2); }
 
   h2.section-title { font-size: 15px; margin: 26px 0 10px; color: var(--ink); }
   h2.section-title:first-child { margin-top: 0; }
@@ -235,7 +311,7 @@
   .grant-box-hint.error { color: var(--red); }
 
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  table.data-table { background: var(--bg-panel); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  table.data-table { background: var(--bg-panel); border: 1px solid var(--border); border-radius: 10px; }
   thead th {
     text-align: left;
     padding: 10px 12px;
@@ -387,19 +463,45 @@
     </div>
   </header>
 
-  <nav class="tabs">
-    <button class="tab-btn active" data-tab="overview">Overview</button>
-    <button class="tab-btn" data-tab="revenue">Revenue &amp; Profit</button>
-    <button class="tab-btn" data-tab="users">Registered Accounts</button>
-    <button class="tab-btn" data-tab="devices">Devices &amp; AI Spend<span class="tab-badge" id="killSwitchTabBadge" style="display:none;"></span></button>
-    <button class="tab-btn" data-tab="calls">AI Call Log</button>
-    <button class="tab-btn" data-tab="kits">Recognized Kits</button>
-    <button class="tab-btn" data-tab="suggestions">Feature Suggestions</button>
-    <button class="tab-btn" data-tab="testers">Tester Applications</button>
-    <button class="tab-btn" data-tab="qrscans">QR Scans</button>
-    <button class="tab-btn" data-tab="traffic">Website Traffic</button>
-    <button class="tab-btn" data-tab="winback">Win-back Offers</button>
-  </nav>
+  <div class="tabs-nav">
+    <button class="menu-toggle" id="menuToggleBtn">
+      <span class="menu-toggle-icon">☰</span>
+      <span id="currentTabLabel">Overview</span>
+      <span class="menu-toggle-badge" id="killSwitchTabBadge" style="display:none;"></span>
+    </button>
+    <div class="tabs-drawer" id="tabsDrawer">
+      <div class="tab-group">
+        <div class="tab-group-label">Overview</div>
+        <button class="tab-btn active" data-tab="overview" data-label="Overview">Overview</button>
+        <button class="tab-btn" data-tab="revenue" data-label="Revenue &amp; Profit">Revenue &amp; Profit</button>
+      </div>
+      <div class="tab-group">
+        <div class="tab-group-label">People</div>
+        <button class="tab-btn" data-tab="users" data-label="Registered Accounts">Registered Accounts</button>
+        <button class="tab-btn" data-tab="devices" data-label="Devices &amp; AI Spend">Devices &amp; AI Spend</button>
+      </div>
+      <div class="tab-group">
+        <div class="tab-group-label">AI</div>
+        <button class="tab-btn" data-tab="calls" data-label="AI Call Log">AI Call Log</button>
+        <button class="tab-btn" data-tab="kits" data-label="Recognized Kits">Recognized Kits</button>
+      </div>
+      <div class="tab-group">
+        <div class="tab-group-label">Growth &amp; Marketing</div>
+        <button class="tab-btn" data-tab="suggestions" data-label="Feature Suggestions">Feature Suggestions</button>
+        <button class="tab-btn" data-tab="testers" data-label="Tester Applications">Tester Applications</button>
+        <button class="tab-btn" data-tab="qrscans" data-label="QR Scans">QR Scans</button>
+        <button class="tab-btn" data-tab="traffic" data-label="Website Traffic">Website Traffic</button>
+        <button class="tab-btn" data-tab="winback" data-label="Win-back Offers">Win-back Offers</button>
+      </div>
+      <div class="tab-group">
+        <div class="tab-group-label">Moderation</div>
+        <button class="tab-btn" data-tab="forum" data-label="Forum">Forum</button>
+        <button class="tab-btn" data-tab="recipeboard" data-label="Recipe Board">Recipe Board</button>
+        <button class="tab-btn" data-tab="blockednames" data-label="Blocked Usernames">Blocked Usernames</button>
+      </div>
+    </div>
+    <div class="tabs-drawer-backdrop" id="tabsDrawerBackdrop"></div>
+  </div>
 
   <main>
     <!-- OVERVIEW -->
@@ -483,10 +585,10 @@
       <table class="data-table">
         <thead>
           <tr>
-            <th>Email</th><th>Tier</th><th>Premium Since</th><th>Signed Up</th><th>Last Sign-In</th><th></th>
+            <th>Username</th><th>Email</th><th>Tier</th><th>Premium Since</th><th>Signed Up</th><th>Last Sign-In</th><th></th>
           </tr>
         </thead>
-        <tbody id="usersTableBody"><tr><td colspan="6" class="empty-note">Loading…</td></tr></tbody>
+        <tbody id="usersTableBody"><tr><td colspan="7" class="empty-note">Loading…</td></tr></tbody>
       </table>
     </section>
 
@@ -690,6 +792,60 @@
         <tbody id="winbackBody"><tr><td colspan="7" class="empty-note">Loading…</td></tr></tbody>
       </table>
     </section>
+
+    <!-- FORUM MODERATION -->
+    <section class="panel" id="panel-forum">
+      <div class="footnote" style="margin-bottom:16px;">
+        Discussion threads and replies (not recipe posts — see the Recipe Board tab for those) and live chat.
+        Deleting here is permanent. Warning queues a one-time popup the account sees on next login; Ban blocks that
+        account from posting anywhere (any device) while still letting them read — Unban reverses it.
+      </div>
+      <h2 class="section-title">Discussion threads</h2>
+      <table class="data-table">
+        <thead><tr><th>Author</th><th>Title</th><th>Posted</th><th></th></tr></thead>
+        <tbody id="forumThreadsBody"><tr><td colspan="4" class="empty-note">Loading…</td></tr></tbody>
+      </table>
+      <h2 class="section-title">Replies</h2>
+      <table class="data-table">
+        <thead><tr><th>Author</th><th>Body</th><th>Posted</th><th></th></tr></thead>
+        <tbody id="forumPostsBody"><tr><td colspan="4" class="empty-note">Loading…</td></tr></tbody>
+      </table>
+      <h2 class="section-title">Chat</h2>
+      <table class="data-table">
+        <thead><tr><th>Author</th><th>Message</th><th>Sent</th><th></th></tr></thead>
+        <tbody id="chatMessagesBody"><tr><td colspan="4" class="empty-note">Loading…</td></tr></tbody>
+      </table>
+    </section>
+
+    <!-- RECIPE BOARD MODERATION -->
+    <section class="panel" id="panel-recipeboard">
+      <div class="footnote" style="margin-bottom:16px;">
+        "Add a Recipe" posts (forum threads carrying a shared recipe) and their replies. Same delete/warn/ban actions
+        as the Forum tab, scoped to recipe posts.
+      </div>
+      <h2 class="section-title">Recipe posts</h2>
+      <table class="data-table">
+        <thead><tr><th>Author</th><th>Title</th><th>Posted</th><th></th></tr></thead>
+        <tbody id="recipeThreadsBody"><tr><td colspan="4" class="empty-note">Loading…</td></tr></tbody>
+      </table>
+      <h2 class="section-title">Replies</h2>
+      <table class="data-table">
+        <thead><tr><th>Author</th><th>Body</th><th>Posted</th><th></th></tr></thead>
+        <tbody id="recipePostsBody"><tr><td colspan="4" class="empty-note">Loading…</td></tr></tbody>
+      </table>
+    </section>
+
+    <!-- BLOCKED USERNAMES -->
+    <section class="panel" id="panel-blockednames">
+      <div class="footnote" style="margin-bottom:16px;">
+        Display names no one can register (impersonation-risk names, plus anything reserved from a past account) —
+        enforced at the database level, not just in the app. Unblock frees a name back up for anyone to take.
+      </div>
+      <table class="data-table">
+        <thead><tr><th>Name</th><th>Reason</th><th>Blocked</th><th></th></tr></thead>
+        <tbody id="blockedNamesBody"><tr><td colspan="4" class="empty-note">Loading…</td></tr></tbody>
+      </table>
+    </section>
   </main>
 </div>
 
@@ -704,6 +860,17 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="warnModal">
+  <div class="modal">
+    <h3 id="warnModalTitle">Warn user</h3>
+    <input type="text" id="warnMessageInput" placeholder="Warning message (shown to them on next login)" value="You breached the forum rules. Any further breaches will result in a permanent ban from the forum." />
+    <div class="modal-actions">
+      <button class="btn-sm" onclick="closeWarnModal()">Cancel</button>
+      <button class="btn-sm danger" id="warnConfirmBtn">Send warning</button>
+    </div>
+  </div>
+</div>
+
 <script>
   const FN_URL = 'https://qrihcvanmkdsaojuhasm.supabase.co/functions/v1/admin-dashboard';
   const KIT_LOOKUP_URL = 'https://qrihcvanmkdsaojuhasm.supabase.co/functions/v1/kit-lookup';
@@ -712,8 +879,10 @@
   let SECRET = localStorage.getItem('hh_admin_secret') || '';
   let usersData = null, devicesData = null, kitsData = null, spendData = null, callsData = null, suggestionsData = null, testersData = null, qrScansData = null, growthData = null, winbackData = null, appConfigData = null, killSwitchData = null, trafficData = null;
   let uptakeData = null, revenueData = null, profitData = null;
+  let forumData = null, recipeBoardData = null, blockedNamesData = null;
   let deviceFilter = 'all';
   let callFeatureFilter = 'all';
+  let userTierFilter = 'all';
 
   async function call(action, extra) {
     const res = await fetch(FN_URL, {
@@ -750,12 +919,24 @@
     tryLogin();
   }
 
+  const tabsDrawer = document.getElementById('tabsDrawer');
+  const tabsDrawerBackdrop = document.getElementById('tabsDrawerBackdrop');
+  function openDrawer() { tabsDrawer.classList.add('open'); tabsDrawerBackdrop.classList.add('open'); }
+  function closeDrawer() { tabsDrawer.classList.remove('open'); tabsDrawerBackdrop.classList.remove('open'); }
+  document.getElementById('menuToggleBtn').onclick = () => {
+    tabsDrawer.classList.contains('open') ? closeDrawer() : openDrawer();
+  };
+  tabsDrawerBackdrop.onclick = closeDrawer;
+
   document.querySelectorAll('.tab-btn').forEach((btn) => {
     btn.onclick = () => {
       document.querySelectorAll('.tab-btn').forEach((b) => b.classList.remove('active'));
       document.querySelectorAll('.panel').forEach((p) => p.classList.remove('active'));
       btn.classList.add('active');
       document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
+      document.getElementById('currentTabLabel').innerHTML = btn.dataset.label;
+      closeDrawer();
+      window.scrollTo(0, 0);
     };
   });
 
@@ -768,7 +949,7 @@
   function tierPillClass(t) { return t || 'unknown'; }
 
   async function refreshAll() {
-    await Promise.all([loadUsers(), loadDevices(), loadKits(), loadSpend(), loadCalls(), loadUptake(), loadRevenue(), loadProfit(), loadSuggestions(), loadTesters(), loadQrScans(), loadSiteVisits(), loadGrowthStats(), loadWinbackOffers(), loadAppConfig(), loadKillSwitchAlerts()]);
+    await Promise.all([loadUsers(), loadDevices(), loadKits(), loadSpend(), loadCalls(), loadUptake(), loadRevenue(), loadProfit(), loadSuggestions(), loadTesters(), loadQrScans(), loadSiteVisits(), loadGrowthStats(), loadWinbackOffers(), loadAppConfig(), loadKillSwitchAlerts(), loadForumContent(), loadRecipeBoard(), loadBlockedNames()]);
   }
 
   async function loadQrScans() {
@@ -1204,34 +1385,61 @@
   function renderUsers() {
     if (!usersData) return;
     const tc = usersData.tierCounts;
+    // Clicking a tier card filters the table below to just that tier —
+    // clicking the same one again (or "Free" when already on "free") clears
+    // back to all. data-tier reuses the same active-state pattern as the
+    // Devices tab's filter buttons.
     document.getElementById('userTierStats').innerHTML = [
-      statCard('Free', tc.free || 0),
-      statCard('Standard', tc.standard || 0, 'green'),
-      statCard('Power User', tc.powerBrewer || 0, 'green'),
-      statCard('Ultimate', tc.ultimate || 0, 'green'),
-    ].join('');
+      ['free', 'Free', tc.free || 0, ''],
+      ['standard', 'Standard', tc.standard || 0, 'green'],
+      ['powerBrewer', 'Power User', tc.powerBrewer || 0, 'green'],
+      ['ultimate', 'Ultimate', tc.ultimate || 0, 'green'],
+    ].map(([tier, label, value, cls]) =>
+      '<div class="stat-card clickable' + (userTierFilter === tier ? ' active' : '') + '" onclick="setUserTierFilter(' + JSON.stringify(tier) + ')">' +
+      '<div class="label">' + label + '</div><div class="value ' + cls + '">' + value + '</div></div>'
+    ).join('');
 
     const q = document.getElementById('userSearch').value.trim().toLowerCase();
     const rows = usersData.users
-      .filter((u) => !q || (u.email || '').toLowerCase().includes(q))
+      .filter((u) => !q || (u.email || '').toLowerCase().includes(q) || (u.displayName || '').toLowerCase().includes(q))
+      .filter((u) => userTierFilter === 'all' || (userTierFilter === 'free' ? !u.premiumEnabled : u.premiumEnabled && u.aiTier === userTierFilter))
       .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
     const body = document.getElementById('usersTableBody');
-    if (!rows.length) { body.innerHTML = '<tr><td colspan="6" class="empty-note">No matching accounts.</td></tr>'; return; }
+    if (!rows.length) { body.innerHTML = '<tr><td colspan="7" class="empty-note">No matching accounts.</td></tr>'; return; }
     body.innerHTML = rows.map((u) => (
       '<tr>' +
+      '<td>' + (u.displayName || '—') + (u.forumBanned ? ' <span class="pill banned">FORUM BANNED</span>' : '') + '</td>' +
       '<td>' + (u.email || '—') + '</td>' +
       '<td><span class="pill ' + (u.premiumEnabled ? tierPillClass(u.aiTier) : 'free') + '">' + (u.premiumEnabled ? tierLabel(u.aiTier) : 'Free') + '</span></td>' +
       '<td>' + fmtDate(u.premiumSince) + '</td>' +
       '<td>' + fmtDate(u.createdAt) + '</td>' +
       '<td>' + fmtDate(u.lastSignInAt) + '</td>' +
-      '<td>' + (u.email
-        ? (u.premiumEnabled
-            ? '<button class="btn-sm danger" onclick="cancelPremium(' + JSON.stringify(u.email) + ')">Cancel premium</button>'
-            : '<button class="btn-sm safe" onclick="quickGrant(' + JSON.stringify(u.email) + ')">Grant premium</button>')
-        : '') + '</td>' +
+      '<td>' +
+        (u.email
+          ? (u.premiumEnabled
+              ? '<button class="btn-sm danger" onclick="cancelPremium(' + JSON.stringify(u.email) + ')">Cancel premium</button>'
+              : '<button class="btn-sm safe" onclick="quickGrant(' + JSON.stringify(u.email) + ')">Grant premium</button>')
+          : '') +
+        (u.forumBanned
+          ? ' <button class="btn-sm safe" onclick="toggleForumBan(' + JSON.stringify(u.userId) + ', false)">Unban (forum)</button>'
+          : ' <button class="btn-sm danger" onclick="toggleForumBan(' + JSON.stringify(u.userId) + ', true)">Ban (forum)</button>') +
+      '</td>' +
       '</tr>'
     )).join('');
+  }
+
+  function setUserTierFilter(tier) {
+    userTierFilter = (userTierFilter === tier) ? 'all' : tier;
+    renderUsers();
+  }
+
+  async function toggleForumBan(userId, banned) {
+    if (banned && !confirm('Ban this account from posting in the Forum? They can still read, just not post, on any device.')) return;
+    try {
+      await call('set_forum_ban', { userId, banned });
+      await loadUsers();
+    } catch (e) { alert('Failed: ' + e.message); }
   }
 
   function quickGrant(email) {
@@ -1411,6 +1619,144 @@
       '<div class="kit-card"><div class="name">' + (k.brand ? k.brand + ' — ' + k.name : k.name) + '</div>' +
       '<div class="meta">' + (k.style ? k.style + ' · ' : '') + 'Confirmed ' + k.matchCount + 'x · Updated ' + fmtDate(k.updatedAt) + '</div></div>'
     )).join('');
+  }
+
+  // ---------------- Forum / Recipe Board / Blocked Names ----------------
+
+  function authorLabel(row) {
+    return (row.displayName || row.email || row.user_id.slice(0, 8) + '…') + (row.forumBanned ? ' <span class="pill banned">BANNED</span>' : '');
+  }
+
+  function moderationActions(row, kind) {
+    // kind is 'thread' or 'post' -- picks which delete action to call.
+    const deleteAction = kind === 'thread' ? 'deleteForumThread' : kind === 'post' ? 'deleteForumPost' : 'deleteChatMessage';
+    const banBtn = row.forumBanned
+      ? '<button class="btn-sm safe" onclick="toggleForumBan(' + JSON.stringify(row.user_id) + ', false)">Unban</button>'
+      : '<button class="btn-sm danger" onclick="toggleForumBan(' + JSON.stringify(row.user_id) + ', true)">Ban</button>';
+    return (
+      '<button class="btn-sm" onclick="openWarnModal(' + JSON.stringify(row.user_id) + ')">Warn</button> ' +
+      banBtn + ' ' +
+      '<button class="btn-sm danger" onclick="' + deleteAction + '(' + JSON.stringify(row.id) + ')">Delete</button>'
+    );
+  }
+
+  async function loadForumContent() {
+    try {
+      forumData = await call('list_forum_content');
+      renderForumContent();
+    } catch (e) { console.error(e); }
+  }
+
+  function renderForumContent() {
+    if (!forumData) return;
+    const threadsBody = document.getElementById('forumThreadsBody');
+    threadsBody.innerHTML = !forumData.threads.length
+      ? '<tr><td colspan="4" class="empty-note">No discussion threads.</td></tr>'
+      : forumData.threads.map((t) => (
+          '<tr><td>' + authorLabel(t) + '</td><td>' + (t.title || '').slice(0, 120) + '</td><td>' + fmtDate(t.created_at) + '</td>' +
+          '<td>' + moderationActions(t, 'thread') + '</td></tr>'
+        )).join('');
+
+    const postsBody = document.getElementById('forumPostsBody');
+    postsBody.innerHTML = !forumData.posts.length
+      ? '<tr><td colspan="4" class="empty-note">No replies.</td></tr>'
+      : forumData.posts.map((p) => (
+          '<tr><td>' + authorLabel(p) + '</td><td>' + (p.body || '').slice(0, 160) + '</td><td>' + fmtDate(p.created_at) + '</td>' +
+          '<td>' + moderationActions(p, 'post') + '</td></tr>'
+        )).join('');
+
+    const chatBody = document.getElementById('chatMessagesBody');
+    chatBody.innerHTML = !forumData.chat.length
+      ? '<tr><td colspan="4" class="empty-note">No chat messages.</td></tr>'
+      : forumData.chat.map((c) => (
+          '<tr><td>' + authorLabel(c) + '</td><td>' + (c.body || '').slice(0, 160) + '</td><td>' + fmtDate(c.created_at) + '</td>' +
+          '<td>' + moderationActions(c, 'chat') + '</td></tr>'
+        )).join('');
+  }
+
+  async function deleteForumThread(id) {
+    if (!confirm('Delete this thread permanently? Its replies stay (orphaned), same as a normal user deleting it.')) return;
+    try { await call('delete_forum_thread', { id }); await Promise.all([loadForumContent(), loadRecipeBoard()]); }
+    catch (e) { alert('Delete failed: ' + e.message); }
+  }
+  async function deleteForumPost(id) {
+    if (!confirm('Delete this reply permanently?')) return;
+    try { await call('delete_forum_post', { id }); await Promise.all([loadForumContent(), loadRecipeBoard()]); }
+    catch (e) { alert('Delete failed: ' + e.message); }
+  }
+  async function deleteChatMessage(id) {
+    if (!confirm('Delete this chat message permanently?')) return;
+    try { await call('delete_chat_message', { id }); await loadForumContent(); }
+    catch (e) { alert('Delete failed: ' + e.message); }
+  }
+
+  let warnTargetUserId = null;
+  function openWarnModal(userId) {
+    warnTargetUserId = userId;
+    document.getElementById('warnMessageInput').value = 'You breached the forum rules. Any further breaches will result in a permanent ban from the forum.';
+    document.getElementById('warnModal').classList.add('active');
+  }
+  function closeWarnModal() {
+    document.getElementById('warnModal').classList.remove('active');
+    warnTargetUserId = null;
+  }
+  document.getElementById('warnConfirmBtn').onclick = async () => {
+    if (!warnTargetUserId) return;
+    const message = document.getElementById('warnMessageInput').value.trim();
+    if (!message) return;
+    try {
+      await call('warn_forum_user', { userId: warnTargetUserId, message });
+      closeWarnModal();
+      await loadUsers();
+    } catch (e) { alert('Failed to send warning: ' + e.message); }
+  };
+
+  async function loadRecipeBoard() {
+    try {
+      recipeBoardData = await call('list_recipe_board');
+      renderRecipeBoard();
+    } catch (e) { console.error(e); }
+  }
+
+  function renderRecipeBoard() {
+    if (!recipeBoardData) return;
+    const threadsBody = document.getElementById('recipeThreadsBody');
+    threadsBody.innerHTML = !recipeBoardData.threads.length
+      ? '<tr><td colspan="4" class="empty-note">No recipe posts.</td></tr>'
+      : recipeBoardData.threads.map((t) => (
+          '<tr><td>' + authorLabel(t) + '</td><td>' + (t.title || '').slice(0, 120) + '</td><td>' + fmtDate(t.created_at) + '</td>' +
+          '<td>' + moderationActions(t, 'thread') + '</td></tr>'
+        )).join('');
+
+    const postsBody = document.getElementById('recipePostsBody');
+    postsBody.innerHTML = !recipeBoardData.posts.length
+      ? '<tr><td colspan="4" class="empty-note">No replies.</td></tr>'
+      : recipeBoardData.posts.map((p) => (
+          '<tr><td>' + authorLabel(p) + '</td><td>' + (p.body || '').slice(0, 160) + '</td><td>' + fmtDate(p.created_at) + '</td>' +
+          '<td>' + moderationActions(p, 'post') + '</td></tr>'
+        )).join('');
+  }
+
+  async function loadBlockedNames() {
+    try {
+      blockedNamesData = (await call('list_blocked_names')).names;
+      renderBlockedNames();
+    } catch (e) { console.error(e); }
+  }
+
+  function renderBlockedNames() {
+    const body = document.getElementById('blockedNamesBody');
+    if (!blockedNamesData || !blockedNamesData.length) { body.innerHTML = '<tr><td colspan="4" class="empty-note">No blocked names.</td></tr>'; return; }
+    body.innerHTML = [...blockedNamesData].sort((a, b) => a.name_lower.localeCompare(b.name_lower)).map((n) => (
+      '<tr><td>' + n.name_lower + '</td><td>' + (n.reason || '—') + '</td><td>' + fmtDate(n.blocked_at) + '</td>' +
+      '<td><button class="btn-sm safe" onclick="unblockName(' + JSON.stringify(n.name_lower) + ')">Unblock</button></td></tr>'
+    )).join('');
+  }
+
+  async function unblockName(nameLower) {
+    if (!confirm('Unblock "' + nameLower + '"? Anyone will be able to register it as their display name.')) return;
+    try { await call('unblock_display_name', { nameLower }); await loadBlockedNames(); }
+    catch (e) { alert('Unblock failed: ' + e.message); }
   }
 </script>
 </body>
