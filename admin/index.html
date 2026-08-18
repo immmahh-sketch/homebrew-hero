@@ -220,8 +220,27 @@
     padding: 18px;
     margin-bottom: 22px;
   }
-  .bar-chart { display: flex; align-items: flex-end; gap: 3px; height: 160px; overflow-x: auto; padding-bottom: 4px; }
-  .bar-chart .bar-col { flex: 0 0 auto; width: 14px; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; position: relative; }
+  /* Wraps a fixed y-axis scale column + the horizontally-scrollable bars —
+     see renderBarChart(). */
+  .chart-with-axis { display: flex; align-items: flex-start; gap: 6px; }
+  .chart-yaxis {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    height: 150px;
+    font-size: 10px;
+    color: var(--text-muted);
+    text-align: right;
+    white-space: nowrap;
+  }
+  .bar-chart { display: flex; align-items: flex-start; gap: 3px; height: 176px; overflow-x: auto; overflow-y: hidden; padding-bottom: 4px; padding-right: 24px; }
+  .bar-chart .bar-col { flex: 0 0 auto; width: 14px; display: flex; flex-direction: column; align-items: center; }
+  /* Fixed at exactly 150px so a bar's own top/bottom:50% (diverging variant)
+     always means the same pixel regardless of how tall the outer .bar-col
+     grows to fit its date label below — see .diverging::before's top:75px,
+     which is deliberately pinned to this same fixed reference. */
+  .bar-chart .bar-track { width: 100%; height: 150px; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; position: relative; }
   .bar-chart .bar { width: 100%; background: var(--amber-deep); border-radius: 2px 2px 0 0; min-height: 2px; transition: background 0.15s; }
   .bar-chart .bar-col:hover .bar { background: var(--amber); }
   .bar-chart .bar-col .tip {
@@ -238,21 +257,22 @@
     z-index: 5;
   }
   .bar-chart .bar-col:hover .tip { display: block; }
+  .bar-chart .bar-col-label { font-size: 9px; color: var(--text-muted); margin-top: 3px; white-space: nowrap; }
 
   /* Diverging variant (profit/loss) — bars grow up from a center baseline for
      positive values, down for negative. Absolute positioning (not flexbox
      centering) so each bar's direction/magnitude is set directly in JS via
      top/bottom + height, rather than relying on cross-axis alignment. */
-  .bar-chart.diverging { position: relative; align-items: stretch; }
+  .bar-chart.diverging { position: relative; }
   .bar-chart.diverging::before {
     content: "";
     position: absolute;
-    left: 0; right: 0; top: 50%;
+    left: 0; right: 0; top: 75px; /* = .bar-track's fixed 150px height / 2 */
     height: 1px;
     background: var(--border);
     z-index: 1;
   }
-  .bar-chart.diverging .bar-col { position: relative; height: 100%; justify-content: flex-start; }
+  .bar-chart.diverging .bar-track { justify-content: flex-start; }
   .bar-chart.diverging .bar { position: absolute; left: 0; right: 0; border-radius: 2px; min-height: 2px; }
   .bar-chart.diverging .bar.profit { background: var(--green); bottom: 50%; border-radius: 2px 2px 0 0; }
   .bar-chart.diverging .bar.loss { background: var(--red); top: 50%; border-radius: 0 0 2px 2px; }
@@ -952,6 +972,60 @@
 
   function fmtUsd(n) { return '$' + n.toFixed(n < 1 ? 4 : 2); }
   function fmtDate(iso) { if (!iso) return '—'; return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }); }
+  function fmtShortDate(iso) { return new Date(iso + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' }); }
+
+  /**
+   * Shared renderer for every day-bucketed bar chart (spend/uptake/revenue/
+   * profit/traffic) — adds a y-axis scale and thinned-out x-axis date labels
+   * so a chart is readable without hovering every single bar, which none of
+   * these had before.
+   * opts: { getValue(day), formatTip(day), formatScale(n), diverging, emptyNote }
+   * `days` items are expected to have a `.day` field (YYYY-MM-DD).
+   */
+  function renderBarChart(el, days, opts) {
+    if (!days || !days.length) {
+      el.className = 'bar-chart';
+      el.innerHTML = '<div class="load-note">' + opts.emptyNote + '</div>';
+      return;
+    }
+    const fmtScale = opts.formatScale || ((n) => String(Math.round(n * 100) / 100));
+    const max = Math.max(...days.map((d) => (opts.diverging ? Math.abs(opts.getValue(d)) : opts.getValue(d))), 0.0001);
+    // Evenly-spaced label indices (always includes the first and last day)
+    // rather than a plain modulo scan — a modulo pattern plus "always show
+    // the last one" can land two labels on adjacent bars near the end,
+    // which then visually overlap since each label is much wider than a bar.
+    const labelCount = Math.min(days.length, 8);
+    const labelIndices = new Set();
+    for (let k = 0; k < labelCount; k++) {
+      labelIndices.add(Math.round((k * (days.length - 1)) / Math.max(1, labelCount - 1)));
+    }
+
+    const bars = days.map((d, i) => {
+      const v = opts.getValue(d);
+      const dateLabel = labelIndices.has(i) ? fmtShortDate(d.day) : '';
+      const barHeightPx = opts.diverging
+        ? Math.max(2, Math.round((Math.abs(v) / max) * 75))
+        : Math.max(2, Math.round((v / max) * 150));
+      const barClass = opts.diverging ? (v >= 0 ? 'bar profit' : 'bar loss') : 'bar';
+      return (
+        '<div class="bar-col">' +
+          '<div class="bar-track">' +
+            '<div class="tip">' + opts.formatTip(d) + '</div>' +
+            '<div class="' + barClass + '" style="height:' + barHeightPx + 'px;"></div>' +
+          '</div>' +
+          '<div class="bar-col-label">' + dateLabel + '</div>' +
+        '</div>'
+      );
+    }).join('');
+
+    const yaxis = opts.diverging
+      ? '<div class="chart-yaxis"><span>+' + fmtScale(max) + '</span><span>0</span><span>-' + fmtScale(max) + '</span></div>'
+      : '<div class="chart-yaxis"><span>' + fmtScale(max) + '</span><span>' + fmtScale(max / 2) + '</span><span>0</span></div>';
+
+    el.className = 'chart-with-axis';
+    el.innerHTML = yaxis + '<div class="bar-chart' + (opts.diverging ? ' diverging' : '') + '">' + bars + '</div>';
+  }
+
   function tierLabel(t) {
     if (!t) return 'Free / Unknown';
     return { standard: 'Standard', powerBrewer: 'Power User', ultimate: 'Ultimate' }[t] || t;
@@ -1042,16 +1116,12 @@
       statCard('Last 30 days', trafficData ? trafficData.total30d : 0),
     ].join('');
 
-    const chartEl = document.getElementById('trafficChart');
-    if (!trafficData || !trafficData.days.length) {
-      chartEl.innerHTML = '<div class="load-note">No pageviews logged yet.</div>';
-    } else {
-      const max = Math.max(...trafficData.days.map((d) => d.count), 1);
-      chartEl.innerHTML = trafficData.days.map((d) => {
-        const h = Math.max(2, Math.round((d.count / max) * 150));
-        return '<div class="bar-col" style="height:150px;"><div class="tip">' + d.day + ': ' + d.count + '</div><div class="bar" style="height:' + h + 'px;"></div></div>';
-      }).join('');
-    }
+    renderBarChart(document.getElementById('trafficChart'), trafficData ? trafficData.days : null, {
+      getValue: (d) => d.count,
+      formatTip: (d) => fmtDate(d.day) + ': ' + d.count,
+      formatScale: (n) => String(Math.round(n)),
+      emptyNote: 'No pageviews logged yet.',
+    });
 
     const pathsBody = document.getElementById('trafficPathsBody');
     pathsBody.innerHTML = (!trafficData || !trafficData.topPaths.length)
@@ -1234,43 +1304,37 @@
   }
 
   function renderUptakeChart() {
-    const el = document.getElementById('uptakeChart');
-    if (!uptakeData || !uptakeData.series.length) { el.innerHTML = '<div class="load-note">No premium accounts yet.</div>'; return; }
-    const max = Math.max(...uptakeData.series.map((d) => d.cumulativePremium), 1);
-    el.innerHTML = uptakeData.series.map((d) => {
-      const h = Math.max(2, Math.round((d.cumulativePremium / max) * 150));
-      return '<div class="bar-col" style="height:150px;"><div class="tip">' + d.day + ': ' + d.cumulativePremium + ' premium accounts</div><div class="bar" style="height:' + h + 'px;"></div></div>';
-    }).join('');
+    renderBarChart(document.getElementById('uptakeChart'), uptakeData ? uptakeData.series : null, {
+      getValue: (d) => d.cumulativePremium,
+      formatTip: (d) => fmtDate(d.day) + ': ' + d.cumulativePremium + ' premium accounts',
+      formatScale: (n) => String(Math.round(n)),
+      emptyNote: 'No premium accounts yet.',
+    });
   }
 
   function renderRevenueChart() {
-    const el = document.getElementById('revenueChart');
     const note = document.getElementById('revenueFootnote');
     if (note) {
       note.textContent = revenueData && revenueData.hasAnyPayments
         ? 'Real revenue from payment_events.'
         : 'Genuinely $0 — no real purchases exist yet (premium is still a free placeholder toggle during testing). This chart is fully wired up and will start showing real numbers automatically once in-app purchases go live — nothing here needs rebuilding later.';
     }
-    if (!revenueData || !revenueData.days.length) { el.innerHTML = '<div class="load-note">No revenue logged yet — see note below.</div>'; return; }
-    const max = Math.max(...revenueData.days.map((d) => d.revenueUsd), 0.0001);
-    el.innerHTML = revenueData.days.map((d) => {
-      const h = Math.max(2, Math.round((d.revenueUsd / max) * 150));
-      return '<div class="bar-col" style="height:150px;"><div class="tip">' + d.day + ': ' + fmtUsd(d.revenueUsd) + '</div><div class="bar" style="height:' + h + 'px;"></div></div>';
-    }).join('');
+    renderBarChart(document.getElementById('revenueChart'), revenueData ? revenueData.days : null, {
+      getValue: (d) => d.revenueUsd,
+      formatTip: (d) => fmtDate(d.day) + ': ' + fmtUsd(d.revenueUsd),
+      formatScale: (n) => fmtUsd(n),
+      emptyNote: 'No revenue logged yet — see note below.',
+    });
   }
 
   function renderProfitChart() {
-    const el = document.getElementById('profitChart');
-    if (!profitData || !profitData.days.length) { el.innerHTML = '<div class="load-note">No data yet.</div>'; return; }
-    const maxAbs = Math.max(...profitData.days.map((d) => Math.abs(d.profitUsd)), 0.0001);
-    el.className = 'bar-chart diverging';
-    el.innerHTML = profitData.days.map((d) => {
-      const halfPx = 75; // half of the 150px chart height
-      const h = Math.max(2, Math.round((Math.abs(d.profitUsd) / maxAbs) * halfPx));
-      const cls = d.profitUsd >= 0 ? 'profit' : 'loss';
-      const label = d.profitUsd >= 0 ? 'profit' : 'loss';
-      return '<div class="bar-col" style="height:150px;"><div class="tip">' + d.day + ': ' + fmtUsd(Math.abs(d.profitUsd)) + ' ' + label + '</div><div class="bar ' + cls + '" style="height:' + h + 'px;"></div></div>';
-    }).join('');
+    renderBarChart(document.getElementById('profitChart'), profitData ? profitData.days : null, {
+      getValue: (d) => d.profitUsd,
+      formatTip: (d) => fmtDate(d.day) + ': ' + fmtUsd(Math.abs(d.profitUsd)) + ' ' + (d.profitUsd >= 0 ? 'profit' : 'loss'),
+      formatScale: (n) => fmtUsd(n),
+      diverging: true,
+      emptyNote: 'No data yet.',
+    });
   }
 
   async function loadCalls() {
@@ -1419,13 +1483,12 @@
   }
 
   function renderSpendChart() {
-    const el = document.getElementById('spendChart');
-    if (!spendData || !spendData.days.length) { el.innerHTML = '<div class="load-note">No AI usage logged yet.</div>'; return; }
-    const max = Math.max(...spendData.days.map((d) => d.costUsd), 0.0001);
-    el.innerHTML = spendData.days.map((d) => {
-      const h = Math.max(2, Math.round((d.costUsd / max) * 150));
-      return '<div class="bar-col" style="height:150px;"><div class="tip">' + d.day + ': ' + fmtUsd(d.costUsd) + '</div><div class="bar" style="height:' + h + 'px;"></div></div>';
-    }).join('');
+    renderBarChart(document.getElementById('spendChart'), spendData ? spendData.days : null, {
+      getValue: (d) => d.costUsd,
+      formatTip: (d) => fmtDate(d.day) + ': ' + fmtUsd(d.costUsd),
+      formatScale: (n) => fmtUsd(n),
+      emptyNote: 'No AI usage logged yet.',
+    });
   }
 
   function renderUsers() {
