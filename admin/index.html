@@ -1424,6 +1424,9 @@
         (u.forumBanned
           ? ' <button class="btn-sm safe" onclick=\'toggleForumBan(' + JSON.stringify(u.userId) + ', false)\'>Unban (forum)</button>'
           : ' <button class="btn-sm danger" onclick=\'toggleForumBan(' + JSON.stringify(u.userId) + ', true)\'>Ban (forum)</button>') +
+        (u.email
+          ? ' <button class="btn-sm danger" onclick=\'deleteAccount(' + JSON.stringify(u.email) + ')\'>Delete account</button>'
+          : '') +
       '</td>' +
       '</tr>'
     )).join('');
@@ -1471,6 +1474,19 @@
       await call('cancel_premium', { email });
       await loadUsers();
     } catch (e) { alert('Failed to cancel: ' + e.message); }
+  }
+
+  async function deleteAccount(email) {
+    if (!confirm(
+      'Permanently delete the account for ' + email + '?\n\n' +
+      'This deletes their brews, recipes, settings, shopping list, and forum activity. ' +
+      'This cannot be undone. They CAN sign up again with the same email — it will be a ' +
+      'brand-new account with nothing carried over, same as a first-time install.'
+    )) return;
+    try {
+      await call('delete_account', { email });
+      await loadUsers();
+    } catch (e) { alert('Failed to delete: ' + e.message); }
   }
 
   document.querySelectorAll('[data-tier]').forEach((btn) => {
