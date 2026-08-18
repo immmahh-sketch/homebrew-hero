@@ -588,6 +588,13 @@
         This is a genuinely working chart, not a placeholder — it'll show real profit the moment real purchases land
         in payment_events, with no further changes needed here.
       </div>
+
+      <h2 class="section-title" style="margin-top:22px;">Cancellation feedback</h2>
+      <div class="footnote" style="margin-bottom:10px;">Captured on the way through the in-app cancel-subscription flow, before the brewer is handed off to their App Store/Play Store subscription settings.</div>
+      <table class="data-table">
+        <thead><tr><th>Date</th><th>Email</th><th>Tier</th><th>Reasons</th><th>Comment</th></tr></thead>
+        <tbody id="cancellationFeedbackBody"><tr><td colspan="5" class="load-note">Loading…</td></tr></tbody>
+      </table>
     </section>
 
     <!-- USERS -->
@@ -907,7 +914,7 @@
   const ANON_KEY = 'sb_publishable_tFB-sh1Zh7lk0StvG9aGdw_v6LCEyck';
 
   let SECRET = localStorage.getItem('hh_admin_secret') || '';
-  let usersData = null, devicesData = null, kitsData = null, spendData = null, callsData = null, suggestionsData = null, testersData = null, qrScansData = null, growthData = null, winbackData = null, appConfigData = null, killSwitchData = null, trafficData = null;
+  let usersData = null, devicesData = null, kitsData = null, spendData = null, callsData = null, suggestionsData = null, testersData = null, qrScansData = null, growthData = null, winbackData = null, appConfigData = null, killSwitchData = null, trafficData = null, cancellationFeedbackData = null;
   let uptakeData = null, revenueData = null, profitData = null;
   let forumData = null, recipeBoardData = null, blockedNamesData = null;
   let deviceFilter = 'all';
@@ -1038,7 +1045,7 @@
     btn.disabled = true;
     btn.textContent = '↻ Refreshing…';
     try {
-      const results = await Promise.allSettled([loadUsers(), loadDevices(), loadKits(), loadSpend(), loadCalls(), loadUptake(), loadRevenue(), loadProfit(), loadSuggestions(), loadTesters(), loadQrScans(), loadSiteVisits(), loadGrowthStats(), loadWinbackOffers(), loadAppConfig(), loadKillSwitchAlerts(), loadForumContent(), loadRecipeBoard(), loadBlockedNames()]);
+      const results = await Promise.allSettled([loadUsers(), loadDevices(), loadKits(), loadSpend(), loadCalls(), loadUptake(), loadRevenue(), loadProfit(), loadSuggestions(), loadTesters(), loadQrScans(), loadSiteVisits(), loadGrowthStats(), loadWinbackOffers(), loadAppConfig(), loadKillSwitchAlerts(), loadForumContent(), loadRecipeBoard(), loadBlockedNames(), loadCancellationFeedback()]);
       const failed = results.filter((r) => r.status === 'rejected');
       if (failed.length > 0) {
         console.error('refreshAll: sections that failed to load', failed);
@@ -1350,6 +1357,30 @@
       renderOverviewStats();
       renderUsers();
     } catch (e) { console.error(e); }
+  }
+
+  async function loadCancellationFeedback() {
+    try {
+      cancellationFeedbackData = (await call('list_cancellation_feedback')).feedback;
+      renderCancellationFeedback();
+    } catch (e) { console.error(e); }
+  }
+
+  function renderCancellationFeedback() {
+    const body = document.getElementById('cancellationFeedbackBody');
+    if (!cancellationFeedbackData || !cancellationFeedbackData.length) {
+      body.innerHTML = '<tr><td colspan="5" class="empty-note">No cancellation feedback yet.</td></tr>';
+      return;
+    }
+    body.innerHTML = cancellationFeedbackData.map((f) => (
+      '<tr>' +
+      '<td>' + fmtDate(f.created_at) + '</td>' +
+      '<td>' + escapeHtml(f.email || '—') + '</td>' +
+      '<td>' + tierLabel(f.tier_at_cancellation) + '</td>' +
+      '<td>' + (f.reasons || []).map(escapeHtml).join(', ') + '</td>' +
+      '<td>' + (f.comment ? escapeHtml(f.comment) : '—') + '</td>' +
+      '</tr>'
+    )).join('');
   }
 
   async function loadDevices() {
