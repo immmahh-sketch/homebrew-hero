@@ -1116,7 +1116,7 @@
       '<td>' + (a.engagementCount ?? '—') + '</td>' +
       '<td>' + (a.aiSpendUsd != null ? fmtUsd(a.aiSpendUsd) : '—') + '</td>' +
       '<td>' + (a.email
-        ? '<button class="btn-sm danger" onclick="cancelPremium(' + JSON.stringify(a.email) + ')">Cancel premium</button>'
+        ? '<button class="btn-sm danger" onclick=\'cancelPremium(' + JSON.stringify(a.email) + ')\'>Cancel premium</button>'
         : '') + '</td>' +
       '</tr>'
     )).join('');
@@ -1338,8 +1338,8 @@
         ' — ' + fmtDate(a.triggered_at) + '</div>' +
         '<div class="actions">' +
         '<button class="btn-sm" onclick="jumpToDevice(\'' + a.device_id + '\')">Investigate</button>' +
-        '<button class="btn-sm safe" onclick="unbanFromAlert(' + JSON.stringify(a.id) + ', \'' + a.device_id + '\')">Unban</button>' +
-        '<button class="btn-sm danger" onclick="acknowledgeKillSwitchAlert(' + JSON.stringify(a.id) + ')">Acknowledge (keep banned)</button>' +
+        '<button class="btn-sm safe" onclick=\'unbanFromAlert(' + JSON.stringify(a.id) + ', ' + JSON.stringify(a.device_id) + ')\'>Unban</button>' +
+        '<button class="btn-sm danger" onclick=\'acknowledgeKillSwitchAlert(' + JSON.stringify(a.id) + ')\'>Acknowledge (keep banned)</button>' +
         '</div></div>'
       )).join('') +
       '<div class="footnote">Acknowledging just clears it from this banner — it does NOT unban the device. Use Unban above if you\'ve checked it out and it\'s a false positive.</div>' +
@@ -1395,7 +1395,7 @@
       ['powerBrewer', 'Power User', tc.powerBrewer || 0, 'green'],
       ['ultimate', 'Ultimate', tc.ultimate || 0, 'green'],
     ].map(([tier, label, value, cls]) =>
-      '<div class="stat-card clickable' + (userTierFilter === tier ? ' active' : '') + '" onclick="setUserTierFilter(' + JSON.stringify(tier) + ')">' +
+      '<div class="stat-card clickable' + (userTierFilter === tier ? ' active' : '') + '" onclick=\'setUserTierFilter(' + JSON.stringify(tier) + ')\'>' +
       '<div class="label">' + label + '</div><div class="value ' + cls + '">' + value + '</div></div>'
     ).join('');
 
@@ -1418,12 +1418,12 @@
       '<td>' +
         (u.email
           ? (u.premiumEnabled
-              ? '<button class="btn-sm danger" onclick="cancelPremium(' + JSON.stringify(u.email) + ')">Cancel premium</button>'
-              : '<button class="btn-sm safe" onclick="quickGrant(' + JSON.stringify(u.email) + ')">Grant premium</button>')
+              ? '<button class="btn-sm danger" onclick=\'cancelPremium(' + JSON.stringify(u.email) + ')\'>Cancel premium</button>'
+              : '<button class="btn-sm safe" onclick=\'quickGrant(' + JSON.stringify(u.email) + ')\'>Grant premium</button>')
           : '') +
         (u.forumBanned
-          ? ' <button class="btn-sm safe" onclick="toggleForumBan(' + JSON.stringify(u.userId) + ', false)">Unban (forum)</button>'
-          : ' <button class="btn-sm danger" onclick="toggleForumBan(' + JSON.stringify(u.userId) + ', true)">Ban (forum)</button>') +
+          ? ' <button class="btn-sm safe" onclick=\'toggleForumBan(' + JSON.stringify(u.userId) + ', false)\'>Unban (forum)</button>'
+          : ' <button class="btn-sm danger" onclick=\'toggleForumBan(' + JSON.stringify(u.userId) + ', true)\'>Ban (forum)</button>') +
       '</td>' +
       '</tr>'
     )).join('');
@@ -1631,12 +1631,12 @@
     // kind is 'thread' or 'post' -- picks which delete action to call.
     const deleteAction = kind === 'thread' ? 'deleteForumThread' : kind === 'post' ? 'deleteForumPost' : 'deleteChatMessage';
     const banBtn = row.forumBanned
-      ? '<button class="btn-sm safe" onclick="toggleForumBan(' + JSON.stringify(row.user_id) + ', false)">Unban</button>'
-      : '<button class="btn-sm danger" onclick="toggleForumBan(' + JSON.stringify(row.user_id) + ', true)">Ban</button>';
+      ? '<button class="btn-sm safe" onclick=\'toggleForumBan(' + JSON.stringify(row.user_id) + ', false)\'>Unban</button>'
+      : '<button class="btn-sm danger" onclick=\'toggleForumBan(' + JSON.stringify(row.user_id) + ', true)\'>Ban</button>';
     return (
-      '<button class="btn-sm" onclick="openWarnModal(' + JSON.stringify(row.user_id) + ')">Warn</button> ' +
+      '<button class="btn-sm" onclick=\'openWarnModal(' + JSON.stringify(row.user_id) + ')\'>Warn</button> ' +
       banBtn + ' ' +
-      '<button class="btn-sm danger" onclick="' + deleteAction + '(' + JSON.stringify(row.id) + ')">Delete</button>'
+      '<button class="btn-sm danger" onclick=\'' + deleteAction + '(' + JSON.stringify(row.id) + ')\'>Delete</button>'
     );
   }
 
@@ -1749,7 +1749,7 @@
     if (!blockedNamesData || !blockedNamesData.length) { body.innerHTML = '<tr><td colspan="4" class="empty-note">No blocked names.</td></tr>'; return; }
     body.innerHTML = [...blockedNamesData].sort((a, b) => a.name_lower.localeCompare(b.name_lower)).map((n) => (
       '<tr><td>' + n.name_lower + '</td><td>' + (n.reason || '—') + '</td><td>' + fmtDate(n.blocked_at) + '</td>' +
-      '<td><button class="btn-sm safe" onclick="unblockName(' + JSON.stringify(n.name_lower) + ')">Unblock</button></td></tr>'
+      '<td><button class="btn-sm safe" onclick=\'unblockName(' + JSON.stringify(n.name_lower) + ')\'>Unblock</button></td></tr>'
     )).join('');
   }
 
