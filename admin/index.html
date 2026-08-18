@@ -3,6 +3,15 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
+<!-- This is a single-file page with all its logic inline — a stale cached
+     copy means stale admin logic with no way to detect it (see the
+     "Refresh all doesn't work, only closing/reopening the tab does" bug:
+     the tab had an old cached copy of this very file's JS in memory).
+     Forces every load to revalidate with the server instead of trusting a
+     disk/PWA cache. -->
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="0" />
 <title>Homebrew Hero — Admin</title>
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icon-192.png" />
@@ -459,7 +468,8 @@
     </div>
     <div style="display:flex; gap:8px; align-items:center;">
       <a class="btn-sm" style="text-decoration:none; display:inline-block;" href="https://platform.claude.com/dashboard" target="_blank" rel="noopener">💳 Anthropic Balance ↗</a>
-      <button class="btn-sm" onclick="refreshAll()">↻ Refresh all</button>
+      <button class="btn-sm" id="refreshAllBtn" onclick="refreshAll()">↻ Refresh all</button>
+      <button class="btn-sm danger" onclick="clearAiUsageData()">🗑️ Clear AI test data</button>
     </div>
   </header>
 
@@ -949,7 +959,43 @@
   function tierPillClass(t) { return t || 'unknown'; }
 
   async function refreshAll() {
-    await Promise.all([loadUsers(), loadDevices(), loadKits(), loadSpend(), loadCalls(), loadUptake(), loadRevenue(), loadProfit(), loadSuggestions(), loadTesters(), loadQrScans(), loadSiteVisits(), loadGrowthStats(), loadWinbackOffers(), loadAppConfig(), loadKillSwitchAlerts(), loadForumContent(), loadRecipeBoard(), loadBlockedNames()]);
+    const btn = document.getElementById('refreshAllBtn');
+    const originalText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = '↻ Refreshing…';
+    try {
+      const results = await Promise.allSettled([loadUsers(), loadDevices(), loadKits(), loadSpend(), loadCalls(), loadUptake(), loadRevenue(), loadProfit(), loadSuggestions(), loadTesters(), loadQrScans(), loadSiteVisits(), loadGrowthStats(), loadWinbackOffers(), loadAppConfig(), loadKillSwitchAlerts(), loadForumContent(), loadRecipeBoard(), loadBlockedNames()]);
+      const failed = results.filter((r) => r.status === 'rejected');
+      if (failed.length > 0) {
+        console.error('refreshAll: sections that failed to load', failed);
+        alert('Refresh finished, but ' + failed.length + ' section(s) failed to load. Open the browser console for details — most likely cause is an expired/incorrect admin secret or a network error.');
+      }
+    } catch (e) {
+      console.error('refreshAll: unexpected failure', e);
+      alert('Refresh failed unexpectedly: ' + e.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = originalText;
+    }
+  }
+
+  async function clearAiUsageData() {
+    const phrase = prompt(
+      'This permanently deletes ALL AI usage/spend records (ai_usage_log + device_ai_budget) for every user/device — meant for a one-time wipe of testing data before going live.\n\n' +
+      'This does NOT touch users, brews, recipes, forum content, or payment records.\n\n' +
+      'This cannot be undone. Type CLEAR AI USAGE DATA to confirm:'
+    );
+    if (phrase !== 'CLEAR AI USAGE DATA') {
+      if (phrase !== null) alert('Confirmation text did not match — nothing was deleted.');
+      return;
+    }
+    try {
+      await call('clear_ai_usage_data', { confirm: phrase });
+      alert('AI usage data cleared.');
+      await refreshAll();
+    } catch (e) {
+      alert('Failed to clear AI usage data: ' + e.message);
+    }
   }
 
   async function loadQrScans() {
