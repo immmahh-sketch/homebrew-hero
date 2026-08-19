@@ -213,6 +213,22 @@
   h2.section-title { font-size: 15px; margin: 26px 0 10px; color: var(--ink); }
   h2.section-title:first-child { margin-top: 0; }
 
+  .lang-loc-row { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 22px; }
+  .lang-loc-col {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 18px;
+    min-width: 220px;
+    flex: 1;
+    max-height: 220px;
+    overflow-y: auto;
+  }
+  .lang-loc-title { color: var(--muted); font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 8px; }
+  .lang-loc-total { text-transform: none; letter-spacing: 0; }
+  .lang-loc-line { display: flex; justify-content: space-between; padding: 3px 0; font-size: 13px; }
+  .lang-loc-count { color: var(--amber); font-weight: 700; }
+
   .chart-wrap {
     background: var(--bg-panel);
     border: 1px solid var(--border);
@@ -601,6 +617,8 @@
     <section class="panel" id="panel-users">
       <div class="stat-row" id="userTierStats"></div>
 
+      <div class="lang-loc-row" id="langLocStats"></div>
+
       <h2 class="section-title" style="margin-top:0;">Testing → launch switch</h2>
       <div class="kit-card app-config-card">
         <div class="load-note">Loading…</div>
@@ -635,10 +653,10 @@
       <table class="data-table">
         <thead>
           <tr>
-            <th>Username</th><th>Email</th><th>Tier</th><th>Premium Since</th><th>Renews</th><th>Signed Up</th><th>Last Sign-In</th><th></th>
+            <th>Username</th><th>Email</th><th>Language</th><th>Location</th><th>Tier</th><th>Premium Since</th><th>Renews</th><th>Signed Up</th><th>Last Sign-In</th><th></th>
           </tr>
         </thead>
-        <tbody id="usersTableBody"><tr><td colspan="8" class="empty-note">Loading…</td></tr></tbody>
+        <tbody id="usersTableBody"><tr><td colspan="10" class="empty-note">Loading…</td></tr></tbody>
       </table>
     </section>
 
@@ -993,6 +1011,56 @@
 
   function fmtUsd(n) { return '$' + n.toFixed(n < 1 ? 4 : 2); }
   function fmtDate(iso) { if (!iso) return '—'; return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }); }
+
+  // Mirrors src/data/languages.ts's LANGUAGE_OPTIONS and src/data/retailers.ts's
+  // COUNTRY_OPTIONS (english labels only — this dashboard doesn't need the
+  // native-script labels the in-app picker shows). Keep in sync by hand if
+  // either list changes; there are few enough entries that a shared-fetch
+  // mechanism isn't worth it for a page that's already a single static file.
+  const LANGUAGE_LABELS = {
+    en: 'English', es: 'Spanish', fr: 'French', de: 'German', it: 'Italian',
+    nl: 'Dutch', pt: 'Portuguese', sv: 'Swedish', no: 'Norwegian', da: 'Danish',
+    fi: 'Finnish', pl: 'Polish', ja: 'Japanese', zh: 'Chinese', mk: 'Macedonian',
+  };
+  const COUNTRY_LABELS = {
+    US: 'United States', UK: 'United Kingdom', CA: 'Canada', AU: 'Australia', IE: 'Ireland',
+    DE: 'Germany', FR: 'France', ES: 'Spain', IT: 'Italy', NL: 'Netherlands', BE: 'Belgium',
+    SE: 'Sweden', NO: 'Norway', DK: 'Denmark', FI: 'Finland', NZ: 'New Zealand',
+    ZA: 'South Africa', PL: 'Poland', AT: 'Austria', CH: 'Switzerland', JP: 'Japan',
+    BR: 'Brazil', MX: 'Mexico', MK: 'North Macedonia',
+  };
+  function languageLabel(code) { return code ? (LANGUAGE_LABELS[code] || code) : '—'; }
+  function countryLabel(code) { return code ? (COUNTRY_LABELS[code] || code) : '—'; }
+
+  // Breakdown of registered accounts by language/location — computed
+  // client-side from the same usersData.users the table below already has,
+  // no separate endpoint needed. "Not set" covers pre-LanguageGate accounts
+  // (that field didn't exist before this feature shipped) as well as anyone
+  // who somehow still has it null.
+  function renderLanguageLocationStats() {
+    const el = document.getElementById('langLocStats');
+    if (!usersData) { el.innerHTML = ''; return; }
+    const langCounts = {}, countryCounts = {};
+    for (const u of usersData.users) {
+      const lang = u.language || '—';
+      const country = u.country || '—';
+      langCounts[lang] = (langCounts[lang] || 0) + 1;
+      countryCounts[country] = (countryCounts[country] || 0) + 1;
+    }
+    function col(title, counts, labelFn) {
+      const rows = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+      return (
+        '<div class="lang-loc-col">' +
+        '<div class="lang-loc-title">' + title + ' <span class="lang-loc-total">(' + rows.length + ')</span></div>' +
+        rows.map(([code, count]) =>
+          '<div class="lang-loc-line"><span>' + (code === '—' ? 'Not set' : labelFn(code)) + '</span>' +
+          '<span class="lang-loc-count">' + count + '</span></div>'
+        ).join('') +
+        '</div>'
+      );
+    }
+    el.innerHTML = col('Languages in use', langCounts, languageLabel) + col('Locations in use', countryCounts, countryLabel);
+  }
   function fmtShortDate(iso) { return new Date(iso + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' }); }
 
   // Renewal countdown for the Registered Users table. u.renewsAt is a
@@ -1575,6 +1643,8 @@
       '<div class="label">' + label + '</div><div class="value ' + cls + '">' + value + '</div></div>'
     ).join('');
 
+    renderLanguageLocationStats();
+
     const q = document.getElementById('userSearch').value.trim().toLowerCase();
     const rows = usersData.users
       .filter((u) => !q || (u.email || '').toLowerCase().includes(q) || (u.displayName || '').toLowerCase().includes(q))
@@ -1582,11 +1652,13 @@
       .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
     const body = document.getElementById('usersTableBody');
-    if (!rows.length) { body.innerHTML = '<tr><td colspan="8" class="empty-note">No matching accounts.</td></tr>'; return; }
+    if (!rows.length) { body.innerHTML = '<tr><td colspan="10" class="empty-note">No matching accounts.</td></tr>'; return; }
     body.innerHTML = rows.map((u) => (
       '<tr>' +
       '<td>' + (u.displayName || '—') + (u.forumBanned ? ' <span class="pill banned">FORUM BANNED</span>' : '') + '</td>' +
       '<td>' + (u.email || '—') + '</td>' +
+      '<td>' + languageLabel(u.language) + '</td>' +
+      '<td>' + countryLabel(u.country) + '</td>' +
       '<td><span class="pill ' + (u.premiumEnabled ? tierPillClass(u.aiTier) : 'free') + '">' + (u.premiumEnabled ? tierLabel(u.aiTier) : 'Free') + '</span></td>' +
       '<td>' + fmtDate(u.premiumSince) + '</td>' +
       '<td>' + renewalCell(u) + '</td>' +
