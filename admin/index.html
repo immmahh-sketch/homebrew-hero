@@ -185,11 +185,16 @@
     main { padding: 22px 26px 60px; }
   }
 
-  /* Every data table scrolls horizontally within its own box instead of
-     blowing out the page width -- setting the table itself to a block box
-     is enough; rows/cells keep their normal table layout inside it. */
-  table.data-table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
-  table.data-table > thead, table.data-table > tbody { display: table; width: 100%; }
+  /* Every data table scrolls horizontally within its own wrapper instead of
+     blowing out the page width. This used to be done by setting the table
+     itself to display:block with thead/tbody forced to display:table --
+     but that makes the header and body into two INDEPENDENT tables, each
+     auto-sizing its own columns from only its own content (a short "Tier"
+     header vs. a wide "Ultimate" pill body cell), so header and body
+     columns silently drifted out of alignment on any table wider than the
+     screen. Scrolling the WRAPPER instead keeps thead/tbody as one real
+     table, so column widths stay shared and aligned. See wrapDataTables(). */
+  .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: 10px; }
   .panel { display: none; }
   .panel.active { display: block; }
 
@@ -246,7 +251,7 @@
     justify-content: space-between;
     height: 150px;
     font-size: 10px;
-    color: var(--text-muted);
+    color: var(--muted);
     text-align: right;
     white-space: nowrap;
   }
@@ -273,7 +278,7 @@
     z-index: 5;
   }
   .bar-chart .bar-col:hover .tip { display: block; }
-  .bar-chart .bar-col-label { font-size: 9px; color: var(--text-muted); margin-top: 3px; white-space: nowrap; }
+  .bar-chart .bar-col-label { font-size: 9px; color: var(--muted); margin-top: 3px; white-space: nowrap; }
 
   /* Diverging variant (profit/loss) — bars grow up from a center baseline for
      positive values, down for negative. Absolute positioning (not flexbox
@@ -941,6 +946,20 @@
 </div>
 
 <script>
+  // Wraps every static <table class="data-table"> in a scrolling div instead
+  // of scrolling the table itself -- see the .table-scroll CSS comment for
+  // why (splitting thead/tbody into two independent tables broke column
+  // alignment). Every table in this page is already in the markup at this
+  // point (rows are filled in later by the various render*() functions),
+  // so a single pass here is enough -- nothing renders a table element
+  // itself after page load, only the rows inside one.
+  document.querySelectorAll('table.data-table').forEach((table) => {
+    const wrap = document.createElement('div');
+    wrap.className = 'table-scroll';
+    table.parentNode.insertBefore(wrap, table);
+    wrap.appendChild(table);
+  });
+
   const FN_URL = 'https://qrihcvanmkdsaojuhasm.supabase.co/functions/v1/admin-dashboard';
   const KIT_LOOKUP_URL = 'https://qrihcvanmkdsaojuhasm.supabase.co/functions/v1/kit-lookup';
   const ANON_KEY = 'sb_publishable_tFB-sh1Zh7lk0StvG9aGdw_v6LCEyck';
@@ -1104,7 +1123,18 @@
     // rather than a plain modulo scan — a modulo pattern plus "always show
     // the last one" can land two labels on adjacent bars near the end,
     // which then visually overlap since each label is much wider than a bar.
-    const labelCount = Math.min(days.length, 8);
+    // Capping at 8 alone isn't enough on a SHORT chart (few days = few bars,
+    // e.g. only 2-6 on a brand-new dataset) — with few bars, min(days.length,
+    // 8) shows every single one, and each ~34px-wide "15 Aug"-style label is
+    // much wider than a 17px bar column, so adjacent labels collide into an
+    // unreadable jumble on a narrow phone regardless of day count. Also cap
+    // by how many labels can actually fit the available bar width, so a
+    // short chart shows fewer, properly-spaced labels instead of a cramped
+    // full set on a mobile screen.
+    const barColWidthPx = 17; // 14px bar + 3px gap, see .bar-chart .bar-col
+    const approxLabelWidthPx = 34; // "15 Aug"-ish at 9px font, worst case
+    const maxLabelsThatFit = Math.max(1, Math.floor((days.length * barColWidthPx) / approxLabelWidthPx));
+    const labelCount = Math.min(days.length, 8, maxLabelsThatFit);
     const labelIndices = new Set();
     for (let k = 0; k < labelCount; k++) {
       labelIndices.add(Math.round((k * (days.length - 1)) / Math.max(1, labelCount - 1)));
@@ -1891,9 +1921,28 @@
     const el = document.getElementById('kitsList');
     if (!rows.length) { el.innerHTML = '<div class="empty-note">No kits in the shared database yet.</div>'; return; }
     el.innerHTML = rows.map((k) => (
-      '<div class="kit-card"><div class="name">' + (k.brand ? k.brand + ' — ' + k.name : k.name) + '</div>' +
-      '<div class="meta">' + (k.style ? k.style + ' · ' : '') + 'Confirmed ' + k.matchCount + 'x · Updated ' + fmtDate(k.updatedAt) + '</div></div>'
+      '<div class="kit-card">' +
+      '<div style="display:flex; align-items:flex-start; justify-content:space-between; gap:10px;">' +
+      '<div><div class="name">' + (k.brand ? k.brand + ' — ' + k.name : k.name) + '</div>' +
+      '<div class="meta">' + (k.style ? k.style + ' · ' : '') + 'Confirmed ' + k.matchCount + 'x · Updated ' + fmtDate(k.updatedAt) + '</div></div>' +
+      '<button class="btn-sm danger" onclick=\'deleteKitSchedule(' + JSON.stringify(k.id) + ', ' + JSON.stringify(k.brand ? k.brand + ' — ' + k.name : k.name) + ')\'>Delete</button>' +
+      '</div></div>'
     )).join('');
+  }
+
+  // Manual removal of a bad/duplicate crowd-sourced kit entry (see the
+  // "Craft Series Cider Kit" mismatch that motivated this) -- goes through
+  // the admin-dashboard endpoint (ADMIN_SECRET-gated), NOT the anonymous
+  // kit-lookup one used to list/read kits, since deleting is destructive
+  // and kit-lookup has no admin auth of its own.
+  async function deleteKitSchedule(id, label) {
+    if (!confirm('Delete "' + label + '" from the shared kit cache? The next brewer to scan this box will have to scan its instructions fresh.')) return;
+    try {
+      await call('delete_kit_schedule', { id });
+      await loadKits();
+    } catch (e) {
+      alert('Delete failed: ' + e.message);
+    }
   }
 
   // ---------------- Forum / Recipe Board / Blocked Names ----------------
