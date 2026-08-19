@@ -600,6 +600,16 @@
     <!-- USERS -->
     <section class="panel" id="panel-users">
       <div class="stat-row" id="userTierStats"></div>
+
+      <h2 class="section-title" style="margin-top:0;">Testing → launch switch</h2>
+      <div class="kit-card app-config-card">
+        <div class="load-note">Loading…</div>
+      </div>
+      <div class="footnote" style="margin-bottom:18px;">
+        While ON, every new sign-in gets a free 6-month Power User grant (the closed-testing allowance) — for testers,
+        not real launch customers. Existing testers who already have their grant keep it regardless of this switch.
+      </div>
+
       <div class="grant-box">
         <div class="grant-box-title">Give someone free premium</div>
         <div class="grant-box-row">
@@ -609,11 +619,14 @@
             <option value="powerBrewer" selected>Power User</option>
             <option value="ultimate">Ultimate</option>
           </select>
+          <input type="number" id="grantMonthsInput" min="1" step="1" placeholder="Months (blank = permanent)" style="width:190px;" />
           <button class="btn-sm safe" id="grantBtn" onclick="grantPremiumFromBox()">Grant premium</button>
         </div>
         <div class="grant-box-hint" id="grantBoxHint">
           Ask them to find their account email in the app under Settings → Account. Takes effect next time they open
-          (or foreground) the app. Doesn't expire on its own — use "Cancel" on their row below to take it back.
+          (or foreground) the app. Leave Months blank for a permanent grant (use "Cancel" on their row below to take
+          it back), or enter a number of months for it to expire automatically — the same countdown shown in the
+          Renews column below.
         </div>
       </div>
       <div class="controls-row">
@@ -622,10 +635,10 @@
       <table class="data-table">
         <thead>
           <tr>
-            <th>Username</th><th>Email</th><th>Tier</th><th>Premium Since</th><th>Signed Up</th><th>Last Sign-In</th><th></th>
+            <th>Username</th><th>Email</th><th>Tier</th><th>Premium Since</th><th>Renews</th><th>Signed Up</th><th>Last Sign-In</th><th></th>
           </tr>
         </thead>
-        <tbody id="usersTableBody"><tr><td colspan="7" class="empty-note">Loading…</td></tr></tbody>
+        <tbody id="usersTableBody"><tr><td colspan="8" class="empty-note">Loading…</td></tr></tbody>
       </table>
     </section>
 
@@ -798,13 +811,14 @@
       <div class="stat-row" id="winbackStats"></div>
 
       <h2 class="section-title">Testing → launch switch</h2>
-      <div class="kit-card" id="appConfigCard">
+      <div class="kit-card app-config-card">
         <div class="load-note">Loading…</div>
       </div>
       <div class="footnote" style="margin-bottom:22px;">
         While ON, every new sign-in gets a free 6-month Power User grant (the closed-testing allowance). Existing
         testers who already have their grant keep it regardless of this switch. Turn OFF once ready to open to real
-        signups — the same app build then serves real customers with the real paywall, no rebuild needed.
+        signups — the same app build then serves real customers with the real paywall, no rebuild needed. (Also
+        shown at the top of the Registered Users tab.)
       </div>
 
       <h2 class="section-title">Automated win-back offers</h2>
@@ -980,6 +994,27 @@
   function fmtUsd(n) { return '$' + n.toFixed(n < 1 ? 4 : 2); }
   function fmtDate(iso) { if (!iso) return '—'; return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }); }
   function fmtShortDate(iso) { return new Date(iso + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' }); }
+
+  // Renewal countdown for the Registered Users table. u.renewsAt is a
+  // YYYY-MM-DD date, sourced server-side (list_users) from whichever applies:
+  // testerPremiumExpiresAt (a hard lapse date — testers, or an admin's
+  // months-limited grant) takes priority over a real subscription's
+  // expiry_time (which auto-renews unless cancelled, hence the different
+  // wording via u.renewsAutomatically). A premium account with neither is a
+  // permanent admin grant, or a real subscriber from before verify-purchase
+  // started linking purchases to accounts (see migration 0041) — either way
+  // there's genuinely no expiry on file to show.
+  function renewalCell(u) {
+    if (!u.premiumEnabled) return '—';
+    if (!u.renewsAt) return '<span class="footnote">No expiry on file</span>';
+    const days = Math.ceil((new Date(u.renewsAt + 'T00:00:00') - new Date(new Date().toDateString())) / 86400000);
+    const dayWord = Math.abs(days) === 1 ? 'day' : 'days';
+    if (days < 0) return '<span class="pill stale">Overdue ' + Math.abs(days) + ' ' + dayWord + '</span>';
+    const label = days === 0 ? 'today' : 'in ' + days + ' ' + dayWord;
+    return u.renewsAutomatically
+      ? '<span class="pill active">Renews ' + label + '</span>'
+      : '<span class="pill quiet">Free access ends ' + label + '</span>';
+  }
 
   /**
    * Shared renderer for every day-bucketed bar chart (spend/uptake/revenue/
@@ -1192,10 +1227,10 @@
   }
 
   function renderAppConfig() {
-    const el = document.getElementById('appConfigCard');
-    if (!appConfigData) { el.innerHTML = '<div class="load-note">Loading…</div>'; return; }
+    const els = document.querySelectorAll('.app-config-card');
+    if (!appConfigData) { els.forEach((el) => { el.innerHTML = '<div class="load-note">Loading…</div>'; }); return; }
     const on = appConfigData.testerAutoGrantEnabled;
-    el.innerHTML =
+    const html =
       '<div style="display:flex; align-items:center; justify-content:space-between;">' +
       '<div>' +
       '<div class="name">Closed-testing auto-grant is <span class="pill ' + (on ? 'active' : 'stale') + '">' + (on ? 'ON' : 'OFF') + '</span></div>' +
@@ -1203,6 +1238,7 @@
       '</div>' +
       '<button class="btn-sm ' + (on ? 'danger' : 'safe') + '" onclick="toggleTesterAutoGrant()">' + (on ? 'Turn OFF (launch)' : 'Turn ON (testing)') + '</button>' +
       '</div>';
+    els.forEach((el) => { el.innerHTML = html; });
   }
 
   async function toggleTesterAutoGrant() {
@@ -1546,13 +1582,14 @@
       .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
     const body = document.getElementById('usersTableBody');
-    if (!rows.length) { body.innerHTML = '<tr><td colspan="7" class="empty-note">No matching accounts.</td></tr>'; return; }
+    if (!rows.length) { body.innerHTML = '<tr><td colspan="8" class="empty-note">No matching accounts.</td></tr>'; return; }
     body.innerHTML = rows.map((u) => (
       '<tr>' +
       '<td>' + (u.displayName || '—') + (u.forumBanned ? ' <span class="pill banned">FORUM BANNED</span>' : '') + '</td>' +
       '<td>' + (u.email || '—') + '</td>' +
       '<td><span class="pill ' + (u.premiumEnabled ? tierPillClass(u.aiTier) : 'free') + '">' + (u.premiumEnabled ? tierLabel(u.aiTier) : 'Free') + '</span></td>' +
       '<td>' + fmtDate(u.premiumSince) + '</td>' +
+      '<td>' + renewalCell(u) + '</td>' +
       '<td>' + fmtDate(u.createdAt) + '</td>' +
       '<td>' + fmtDate(u.lastSignInAt) + '</td>' +
       '<td>' +
@@ -1594,13 +1631,23 @@
   async function grantPremiumFromBox() {
     const email = document.getElementById('grantEmailInput').value.trim();
     const tier = document.getElementById('grantTierSelect').value;
+    const monthsRaw = document.getElementById('grantMonthsInput').value.trim();
+    const months = monthsRaw ? parseInt(monthsRaw, 10) : null;
     const hint = document.getElementById('grantBoxHint');
     if (!email) { hint.textContent = 'Enter an account email first.'; hint.className = 'grant-box-hint error'; return; }
+    if (monthsRaw && (!Number.isFinite(months) || months < 1)) {
+      hint.textContent = 'Months must be a whole number of 1 or more (or leave it blank for a permanent grant).';
+      hint.className = 'grant-box-hint error';
+      return;
+    }
     try {
-      await call('grant_premium', { email, tier });
-      hint.textContent = 'Granted ' + tierLabel(tier) + ' to ' + email + '. It applies next time they open the app.';
+      await call('grant_premium', { email, tier, months: months || undefined });
+      hint.textContent = 'Granted ' + tierLabel(tier) + ' to ' + email +
+        (months ? ' for ' + months + ' month' + (months === 1 ? '' : 's') + '.' : ' permanently.') +
+        ' It applies next time they open the app.';
       hint.className = 'grant-box-hint success';
       document.getElementById('grantEmailInput').value = '';
+      document.getElementById('grantMonthsInput').value = '';
       await loadUsers();
     } catch (e) {
       hint.textContent = 'Failed: ' + e.message;
