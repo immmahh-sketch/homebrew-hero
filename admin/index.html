@@ -543,6 +543,7 @@
         <button class="tab-btn" data-tab="qrscans" data-label="QR Scans">QR Scans</button>
         <button class="tab-btn" data-tab="traffic" data-label="Website Traffic">Website Traffic</button>
         <button class="tab-btn" data-tab="winback" data-label="Win-back Offers">Win-back Offers</button>
+        <button class="tab-btn" data-tab="mailinglist" data-label="Mailing List">Mailing List</button>
       </div>
       <div class="tab-group">
         <div class="tab-group-label">Moderation</div>
@@ -658,10 +659,10 @@
       <table class="data-table">
         <thead>
           <tr>
-            <th>Username</th><th>Email</th><th>Language</th><th>Location</th><th>Tier</th><th>Premium Since</th><th>Renews</th><th>Signed Up</th><th>Last Sign-In</th><th></th>
+            <th>Username</th><th>Email</th><th>Language</th><th>Location</th><th>Tier</th><th>Premium Since</th><th>Renews</th><th>Signed Up</th><th>Last Sign-In</th><th>Tester Mode</th><th></th>
           </tr>
         </thead>
-        <tbody id="usersTableBody"><tr><td colspan="10" class="empty-note">Loading…</td></tr></tbody>
+        <tbody id="usersTableBody"><tr><td colspan="11" class="empty-note">Loading…</td></tr></tbody>
       </table>
     </section>
 
@@ -767,6 +768,26 @@
           </tr>
         </thead>
         <tbody id="testersBody"><tr><td colspan="10" class="empty-note">Loading…</td></tr></tbody>
+      </table>
+    </section>
+
+    <!-- MAILING LIST -->
+    <section class="panel" id="panel-mailinglist">
+      <p class="load-note" style="margin-bottom:14px;">
+        Everyone who ticked "Brewing offers &amp; deals" on the username step. Stored separately from the
+        public profiles table (see migration 0008) — this read only works via the service role, so this
+        page is the only place the list can actually be pulled for a mailshot.
+      </p>
+      <button class="btn-sm" id="exportMailingListBtn" onclick="exportMailingListCsv()" style="margin-bottom:14px;">⬇ Export CSV</button>
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Email</th>
+            <th>Display name</th>
+            <th>Opted in</th>
+          </tr>
+        </thead>
+        <tbody id="mailingListBody"><tr><td colspan="3" class="empty-note">Loading…</td></tr></tbody>
       </table>
     </section>
 
@@ -965,7 +986,7 @@
   const ANON_KEY = 'sb_publishable_tFB-sh1Zh7lk0StvG9aGdw_v6LCEyck';
 
   let SECRET = localStorage.getItem('hh_admin_secret') || '';
-  let usersData = null, devicesData = null, kitsData = null, spendData = null, callsData = null, suggestionsData = null, testersData = null, qrScansData = null, growthData = null, winbackData = null, appConfigData = null, killSwitchData = null, trafficData = null, cancellationFeedbackData = null;
+  let usersData = null, devicesData = null, kitsData = null, spendData = null, callsData = null, suggestionsData = null, testersData = null, qrScansData = null, growthData = null, winbackData = null, appConfigData = null, killSwitchData = null, trafficData = null, cancellationFeedbackData = null, mailingListData = null;
   let uptakeData = null, revenueData = null, profitData = null;
   let forumData = null, recipeBoardData = null, blockedNamesData = null;
   let deviceFilter = 'all';
@@ -1178,7 +1199,7 @@
     btn.disabled = true;
     btn.textContent = '↻ Refreshing…';
     try {
-      const results = await Promise.allSettled([loadUsers(), loadDevices(), loadKits(), loadSpend(), loadCalls(), loadUptake(), loadRevenue(), loadProfit(), loadSuggestions(), loadTesters(), loadQrScans(), loadSiteVisits(), loadGrowthStats(), loadWinbackOffers(), loadAppConfig(), loadKillSwitchAlerts(), loadForumContent(), loadRecipeBoard(), loadBlockedNames(), loadCancellationFeedback()]);
+      const results = await Promise.allSettled([loadUsers(), loadDevices(), loadKits(), loadSpend(), loadCalls(), loadUptake(), loadRevenue(), loadProfit(), loadSuggestions(), loadTesters(), loadQrScans(), loadSiteVisits(), loadGrowthStats(), loadWinbackOffers(), loadAppConfig(), loadKillSwitchAlerts(), loadForumContent(), loadRecipeBoard(), loadBlockedNames(), loadCancellationFeedback(), loadMailingList()]);
       const failed = results.filter((r) => r.status === 'rejected');
       if (failed.length > 0) {
         console.error('refreshAll: sections that failed to load', failed);
@@ -1356,6 +1377,46 @@
       testersData = (await call('list_tester_applications')).applications;
       renderTesters();
     } catch (e) { console.error(e); }
+  }
+
+  async function loadMailingList() {
+    try {
+      mailingListData = (await call('list_marketing_optins')).optins;
+      renderMailingList();
+    } catch (e) { console.error(e); }
+  }
+
+  function renderMailingList() {
+    const body = document.getElementById('mailingListBody');
+    if (!mailingListData || !mailingListData.length) { body.innerHTML = '<tr><td colspan="3" class="empty-note">No opt-ins yet.</td></tr>'; return; }
+    body.innerHTML = mailingListData.map((o) => (
+      '<tr>' +
+      '<td>' + escapeHtml(o.email || '—') + '</td>' +
+      '<td>' + escapeHtml(o.displayName || '—') + '</td>' +
+      '<td>' + fmtDate(o.optedInAt) + '</td>' +
+      '</tr>'
+    )).join('');
+  }
+
+  // Client-side CSV, no dependency needed — this list only ever needs to be
+  // handed off to whatever mail-sending tool is actually used (Mailchimp,
+  // etc.), which all accept a plain CSV import.
+  function exportMailingListCsv() {
+    if (!mailingListData || !mailingListData.length) { alert('No opt-ins to export yet.'); return; }
+    const escapeCsv = (v) => '"' + String(v ?? '').replace(/"/g, '""') + '"';
+    const rows = [['Email', 'Display name', 'Opted in'].map(escapeCsv).join(',')];
+    for (const o of mailingListData) {
+      rows.push([o.email, o.displayName ?? '', o.optedInAt ?? ''].map(escapeCsv).join(','));
+    }
+    const blob = new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'homebrew-hero-mailing-list-' + new Date().toISOString().slice(0, 10) + '.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   }
 
   function renderTesters() {
@@ -1682,7 +1743,7 @@
       .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
     const body = document.getElementById('usersTableBody');
-    if (!rows.length) { body.innerHTML = '<tr><td colspan="10" class="empty-note">No matching accounts.</td></tr>'; return; }
+    if (!rows.length) { body.innerHTML = '<tr><td colspan="11" class="empty-note">No matching accounts.</td></tr>'; return; }
     body.innerHTML = rows.map((u) => (
       '<tr>' +
       '<td>' + (u.displayName || '—') + (u.forumBanned ? ' <span class="pill banned">FORUM BANNED</span>' : '') + '</td>' +
@@ -1694,6 +1755,12 @@
       '<td>' + renewalCell(u) + '</td>' +
       '<td>' + fmtDate(u.createdAt) + '</td>' +
       '<td>' + fmtDate(u.lastSignInAt) + '</td>' +
+      '<td>' +
+        (u.email
+          ? '<button class="btn-sm ' + (u.testerMode ? 'danger' : 'safe') + '" onclick=\'toggleTesterMode(' + JSON.stringify(u.email) + ', ' + !u.testerMode + ')\'>' +
+            (u.testerMode ? 'ON' : 'OFF') + '</button>'
+          : '—') +
+      '</td>' +
       '<td>' +
         (u.email
           ? (u.premiumEnabled
@@ -1720,6 +1787,19 @@
     if (banned && !confirm('Ban this account from posting in the Forum? They can still read, just not post, on any device.')) return;
     try {
       await call('set_forum_ban', { userId, banned });
+      await loadUsers();
+    } catch (e) { alert('Failed: ' + e.message); }
+  }
+
+  // Turning ON does NOT itself grant premium — the tester starts free and
+  // walks through the real Upgrade UI, which bypasses real billing while
+  // this is set (see useSubscriptionPurchase). It also starts the
+  // 48-hours-after-every-login re-engagement reminder client-side. Turning
+  // OFF only stops future reminders/bypasses; whatever tier they've already
+  // reached stays as-is (use Cancel premium separately to take that back).
+  async function toggleTesterMode(email, enabled) {
+    try {
+      await call('set_tester_mode', { email, enabled });
       await loadUsers();
     } catch (e) { alert('Failed: ' + e.message); }
   }
