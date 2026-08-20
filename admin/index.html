@@ -551,6 +551,10 @@
         <button class="tab-btn" data-tab="recipeboard" data-label="Recipe Board">Recipe Board</button>
         <button class="tab-btn" data-tab="blockednames" data-label="Blocked Usernames">Blocked Usernames</button>
       </div>
+      <div class="tab-group">
+        <div class="tab-group-label">Tools</div>
+        <button class="tab-btn" data-tab="claudeprompt" data-label="Claude Continuity">Claude Continuity</button>
+      </div>
     </div>
     <div class="tabs-drawer-backdrop" id="tabsDrawerBackdrop"></div>
   </div>
@@ -941,6 +945,18 @@
         <tbody id="blockedNamesBody"><tr><td colspan="4" class="empty-note">Loading…</td></tr></tbody>
       </table>
     </section>
+
+    <!-- CLAUDE CONTINUITY -->
+    <section class="panel" id="panel-claudeprompt">
+      <div class="footnote" style="margin-bottom:16px;">
+        Paste this straight into a brand-new Claude chat if this one is ever lost — it briefs Claude on
+        everything about this app's setup, so it can pick up exactly where things left off with no other
+        context needed. Kept up to date by hand whenever the setup, locations, or status of anything changes —
+        see the note embedded at the top of the prompt itself for the update rule.
+      </div>
+      <button class="btn-sm" id="copyContinuityBtn" onclick="copyContinuityPrompt()" style="margin-bottom:14px;">⧉ Copy to clipboard</button>
+      <textarea id="continuityPromptBox" readonly style="width:100%; min-height:70vh; background:var(--bg-panel); color:var(--ink); border:1px solid var(--border); border-radius:10px; padding:16px; font-family:ui-monospace,SFMono-Regular,Consolas,monospace; font-size:12.5px; line-height:1.6; white-space:pre-wrap;"></textarea>
+    </section>
   </main>
 </div>
 
@@ -1213,6 +1229,78 @@
       btn.textContent = originalText;
     }
   }
+
+  // Static, hand-maintained briefing for a brand-new Claude chat if this
+  // session/machine is ever lost — see the "How to keep this updated" note
+  // embedded at its own top. Not fetched from anywhere; edit this string
+  // directly whenever the app's setup, locations, or status change, then
+  // push this file live (see the Documents\App\ live-deploy rule — this
+  // dashboard itself has the same two-copies gotcha, don't forget it here).
+  const CONTINUITY_PROMPT = `You are picking up work on "Homebrew Hero" (package/bundle id com.homebrewhero.app, formerly named BrewBuddy — some old paths/refs still say brewbuddy), a React Native/Expo homebrew-companion mobile app, for a solo non-technical founder (Paul Riley) who directs the work conversationally and relies on you to handle all the technical execution. Read this whole brief before doing anything — it's meant to fully replace a lost chat session.
+
+HOW TO KEEP THIS UPDATED (read this first): this prompt lives as a hardcoded JS string in the admin dashboard's "Claude Continuity" tab. Whenever you make a change that affects app setup, file locations, credentials, pricing, monetization state, launch/submission status, or the build pipeline, update the CONTINUITY_PROMPT constant in dashboard.html to match, then push the dashboard live (see the "Admin dashboard" section below — it has its own two-copies gotcha, don't forget it applies to editing this very prompt too). Stale sections here are worse than no section — verify anything load-bearing against the actual code/config before relying on it blindly, the same way you'd treat any other memory.
+
+=== WHAT THE APP IS ===
+Homebrew Hero helps home brewers (beer/wine/cider/mead) track brews from pitch to packaging: a scheduling/reminder system per brew, a recipe library, a "Popular Clones" library of recipes approximating real commercial beers (with real-vs-approximated sourcing badges), an AI assistant ("Hero") for troubleshooting and recipe tweaks, a community forum, kit/recipe photo scanning (AI-extracted brew schedules from a photographed kit box or instruction sheet), a shopping list with live "where to buy" retailer price lookups, and a freemium subscription model (free tier + Standard/Power Brewer/Ultimate paid tiers) monetized via real Apple/Google in-app subscriptions plus rewarded-ad unlocks on the free tier.
+
+=== WHERE EVERYTHING LIVES ===
+- App source code (the live working copy — edit here, this is the source of truth): C:\\BrewBuddy-App, a git repo, GitHub remote immmahh-sketch/BrewBuddy-App. React Native + Expo SDK 54 (despite AGENTS.md/CLAUDE.md telling you to read Expo v57 docs — that's a known stale instruction, ignore the version number, SDK 54 is correct), TypeScript, React Navigation (native stack + bottom tabs), i18n via react-i18next with full key parity required across 15 locale files in src/i18n/locales/.
+- Backend: Supabase project ref qrihcvanmkdsaojuhasm. Postgres tables + Edge Functions (supabase/functions/*/index.ts) + migrations (supabase/migrations/*.sql, sequential, never edit a past one). Auth: Supabase Auth with Google and Sign in with Apple providers.
+- Non-code deliverables (marketing, legal, signing keys, builds, the admin dashboard) live ONLY under C:\\Users\\GM\\Documents\\App\\ on the user's work laptop — this is a hard standing rule (the user has lost work twice from things being left only in an ephemeral scratchpad/temp dir). Never leave a finished deliverable only in scratchpad. Subfolders: App-Source-Code\\ (a stale point-in-time snapshot, NOT the working copy — ignore it, edit C:\\BrewBuddy-App instead), Legal\\, Marketing\\Ads\\, Marketing\\Brand-Logos\\, Marketing\\Supplier-Partnership\\, Launch-Planning\\, Builds\\ (latest test APK only — iOS builds go straight to TestFlight, no local IPA artifact in this pipeline), App-Store-Assets\\ (final uploaded App Store screenshot set), Play-Store-Assets\\, Admin-Dashboard\\dashboard.html (see below), Website\\ (a mirror — the live site is a separate repo, see below), Android-Signing\\, iOS-Signing\\ (signing keys/certs/passwords — read the README.txt in each before touching).
+- The public website (homebrewhero.app) and the admin dashboard's LIVE deploy are BOTH served from a separate GitHub repo: immmahh-sketch/homebrew-hero, via GitHub Pages. Do not confuse this with the app's own repo.
+
+=== ADMIN DASHBOARD — IMPORTANT GOTCHA ===
+There are TWO copies of the admin dashboard and both must always be updated together:
+1. C:\\Users\\GM\\Documents\\App\\Admin-Dashboard\\dashboard.html — local canonical source file, edit here.
+2. homebrewhero.app/admin — the LIVE deployed copy, and the ONLY one the user actually looks at. Served from the immmahh-sketch/homebrew-hero repo's admin/index.html.
+After ANY edit to dashboard.html, you MUST also: fresh-clone https://github.com/immmahh-sketch/homebrew-hero.git to a temp dir (don't reuse a possibly-stale/dirty existing clone), copy the updated dashboard.html over admin/index.html, git add/commit/push. Treat "update the admin dashboard" as incomplete until that push has happened. This drifted out of sync once already (2026-08-20) before the user caught it and gave this as a standing instruction.
+The dashboard is gated by a shared secret (ADMIN_SECRET) stored in the browser's localStorage after first unlock — the secret's actual value lives with the user, not in this prompt. Every admin action is a POST to supabase/functions/admin-dashboard/index.ts with an {action: '...'} body and an x-admin-secret header; follow that exact pattern (see the call() helper near the top of dashboard.html's <script>) when adding new admin features.
+
+=== BUILD & UPDATE PIPELINE ===
+Two layers, and knowing which one a change needs matters a lot for turnaround time:
+1. NATIVE BUILDS (GitHub Actions, .github/workflows/): build-signed-ipa.yml (→ TestFlight, real signing), build-debug-apk.yml (Android debug APK, downloadable), build-release-aab.yml, build-unsigned-ipa.yml. Trigger via gh workflow run <file> --ref master. Bump src/buildInfo.ts's BUILD_VERSION (format 1.00NN) before every new build — it's shown in Settings' footer and baked into the output filename. Standing rule: NEVER trigger a build proactively — only when the user explicitly asks in that exact message.
+2. EAS UPDATE (OTA, JS-only): set up 2026-08-20. Project id 21b1b368-5428-4fb0-84f7-82fc18991d6b, owner immmahh, runtimeVersion policy "appVersion" (tied to app.json's semver "version", currently 1.0.0), update URL baked into app.json's updates.url, channel pinned to "production" via a static updates.requestHeaders.expo-channel-name header (this project's builds don't run through eas build, so there's no build-profile-based channel injection — this static-header approach is the deliberate workaround). App.tsx checks for and applies a pending update before hiding the splash screen on every cold start (src/updates.ts, checkAndApplyUpdate(), 6s timeout so a slow network never blocks launch). Publish with: npx --yes eas-cli@latest update --branch production --message "..." --non-interactive. IMPORTANT: only builds compiled AFTER the EAS Update wiring landed (build 19 / BUILD_VERSION 1.0025 onward) can actually receive OTA updates — a build compiled before that has no expo-updates runtime baked in and can never be OTA-patched, only native code/asset changes reach it via a fresh native build. Use OTA for JS/data/asset changes (bug fixes, copy, images, data files); a fresh native build is only needed for native module changes, app.json/plugin config changes, or new native permissions.
+
+=== MONETIZATION — CURRENT STATE ===
+Real subscriptions on both platforms, three tiers, same pricing structure both stores (Android via expo-iap + Play Billing, iOS via StoreKit 2): Standard £4.99/mo or £49.99/yr, Power Brewer £10.99/mo or £109.99/yr, Ultimate £19.99/mo or £199.99/yr. Every tier unlocks every feature — higher tiers just get a larger monthly AI "fair use" $ budget (not a raw call count shown to the user): Standard $1.25/mo, Power Brewer $3.75/mo, Ultimate $8.75/mo, enforced server-side in supabase/functions/ai-proxy/index.ts. Free tier: one lifetime brew, ads-unlock mechanism for temporary access to premium clone recipes, no AI features except a one-time Hero text-only trial.
+Purchases are verified server-side against the real Apple/Google APIs before being granted (supabase/functions/verify-purchase/ for Android via Play Developer API, verify-purchase-ios/ for iOS via App Store Server API) — never trust a client's own claim of having purchased something.
+SECURITY FIX (2026-08-20, important): ai-proxy used to trust a client-reported x-ai-tier header for how much AI budget to grant — a modified client could claim any tier for free. Fixed: ai-proxy now resolves the real tier from iap_subscriptions (populated only by the two verify-purchase functions above) or, failing that, from admin_premium_grants (a table with NO RLS policies at all — reachable only by service-role code, i.e. admin-dashboard and ai-proxy — specifically because user_settings.data, where things like testerMode used to live, is pushed wholesale by every device's own sync under the user's own session and is therefore just as spoofable as a client header). admin-dashboard's grant_premium/set_tester_mode/cancel_premium actions all write to admin_premium_grants now, not just user_settings.data. The automatic "every new sign-up gets a free 6-month Power Brewer grant during closed testing" flow (gated by app_config.tester_auto_grant_enabled) was also moved server-side into supabase/functions/claim-tester-grant/ for the same reason — App.tsx calls it via supabase.functions.invoke('claim-tester-grant'), which forwards the caller's own session JWT so it can only ever grant to whoever is actually signed in.
+Android production readiness: blocked on Google Play's closed-testing gate — 12+ real testers opted into a closed test track for 14 continuous days before Play allows production purchases. Recruitment for this was just starting as of 2026-08-20 (a batch of Facebook ad drafts scheduled) — check current status before assuming this gate has cleared.
+iOS: real StoreKit 2 purchases wired and TestFlight-tested; going live for real customers additionally needs the App Store submission to be approved (see below) and the app's release setting/"Add for Review" click, which only the user does themselves.
+AdMob: still on Google's published TEST ad unit IDs as of the last check — confirm whether a real AdMob account is live before assuming ad revenue is real.
+
+=== APP STORE / PLAY STORE SUBMISSION STATUS ===
+Check current status directly in App Store Connect (app Apple ID 6801927273) and Play Console (app id 4972409585469186300) rather than trusting a stale snapshot here. As of 2026-08-20: iOS build attached was swapped to the first EAS-Update-capable build; Pricing (Free) and Availability (all 175 regions) were set; App Privacy nutrition label published; Content Rights and the MRDP compliance question were answered by the user directly (never answer either of those on the user's behalf — they're legal/tax attestations); a 13" iPad screenshot was added (the app is a phone-first layout, letterboxed on iPad, supportsTablet:true in app.json). "Add for Review" itself is always the user's own click, never do it for them. Release is set to "Automatically release this version" — a build swap right before submitting matters a lot given that.
+
+=== KEY STANDING RULES (from accumulated user feedback) ===
+- Never trigger a build workflow proactively — only on an explicit ask in that message.
+- Never leave a deliverable only in scratchpad — write straight to C:\\Users\\GM\\Documents\\App\\.
+- Every admin dashboard edit needs the live-push described above, not just a local save.
+- Verify changes on BOTH Android and iOS, not just one, before calling something done.
+- Never fill in App Store Connect / Play Console credentials, passwords, or answer legal/tax attestations (MRDP, Content Rights) on the user's behalf — flag them and explain, let the user act.
+- If you hit a rate limit/session limit mid-task, retry roughly every 30 minutes for up to 5 hours rather than giving up.
+- Bump BUILD_VERSION before every new test build.
+
+=== MEMORY SYSTEM ===
+There is a separate persistent memory system at C:\\Users\\GM\\.claude\\projects\\C--BrewBuddy-App\\memory\\ (MEMORY.md is the index) that a Claude Code session normally reads automatically — this prompt is a deliberately self-contained BACKUP of that in case memory itself is ever lost or you're starting in a context that doesn't have it loaded, so it repeats some of the same ground on purpose. If you do have access to that memory folder, read it too and prefer it for anything more recent than this prompt's last update.
+
+=== WHAT TO DO NOW ===
+Don't assume this prompt is fully current — spot-check anything you're about to rely on (BUILD_VERSION, submission status, monetization gates) against the real code/dashboard/App Store Connect before acting on it, then ask the user what they want to work on next.`;
+
+  function renderContinuityPrompt() {
+    const el = document.getElementById('continuityPromptBox');
+    if (el) el.value = CONTINUITY_PROMPT;
+  }
+
+  function copyContinuityPrompt() {
+    navigator.clipboard.writeText(CONTINUITY_PROMPT).then(() => {
+      const btn = document.getElementById('copyContinuityBtn');
+      const original = btn.textContent;
+      btn.textContent = '✓ Copied';
+      setTimeout(() => { btn.textContent = original; }, 1800);
+    }).catch(() => alert('Copy failed — select the text in the box and copy manually.'));
+  }
+  renderContinuityPrompt();
 
   async function clearAiUsageData() {
     const phrase = prompt(
