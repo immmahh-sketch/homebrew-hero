@@ -553,6 +553,7 @@
       </div>
       <div class="tab-group">
         <div class="tab-group-label">Tools</div>
+        <button class="tab-btn" data-tab="retailercatalog" data-label="Retailer Catalog">Retailer Catalog</button>
         <button class="tab-btn" data-tab="claudeprompt" data-label="Claude Continuity">Claude Continuity</button>
       </div>
     </div>
@@ -946,6 +947,30 @@
       </table>
     </section>
 
+    <!-- RETAILER CATALOG -->
+    <section class="panel" id="panel-retailercatalog">
+      <div class="footnote" style="margin-bottom:16px;">
+        Which real retailers, in which countries, actually carry which brewing ingredients — populated by
+        scripts/backfill-ingredient-catalog.mjs (run manually per country), not by the app itself. "Matched"
+        is how many of the retailer's checked search terms found a real product; click a row to see the
+        exact items, prices, and when each was last checked.
+      </div>
+      <div id="retailerCatalogSummaryView">
+        <table class="data-table">
+          <thead><tr><th>Country</th><th>Retailer</th><th>Matched</th><th>Last Checked</th><th></th></tr></thead>
+          <tbody id="retailerCatalogSummaryBody"><tr><td colspan="5" class="empty-note">Loading…</td></tr></tbody>
+        </table>
+      </div>
+      <div id="retailerCatalogDetailView" style="display:none;">
+        <button class="btn-sm" onclick="closeRetailerCatalogDetail()" style="margin-bottom:14px;">← Back to all retailers</button>
+        <h2 class="section-title" id="retailerCatalogDetailTitle" style="margin-top:0;"></h2>
+        <table class="data-table">
+          <thead><tr><th>Search term</th><th>Matched</th><th>Product</th><th>Price</th><th>Available</th><th>Checked</th></tr></thead>
+          <tbody id="retailerCatalogDetailBody"></tbody>
+        </table>
+      </div>
+    </section>
+
     <!-- CLAUDE CONTINUITY -->
     <section class="panel" id="panel-claudeprompt">
       <div class="footnote" style="margin-bottom:16px;">
@@ -1088,6 +1113,15 @@
   function languageLabel(code) { return code ? (LANGUAGE_LABELS[code] || code) : '—'; }
   function countryLabel(code) { return code ? (COUNTRY_LABELS[code] || code) : '—'; }
 
+  // Mirrors src/data/retailers.ts's currencySymbol per country — same
+  // hand-sync convention as LANGUAGE_LABELS/COUNTRY_LABELS above.
+  const CURRENCY_BY_COUNTRY = {
+    US: '$', UK: '£', CA: 'CA$', AU: 'AU$', IE: '€', DE: '€', FR: '€', ES: '€', IT: '€',
+    NL: '€', BE: '€', SE: 'kr', NO: 'kr', DK: 'kr', FI: '€', NZ: 'NZ$', ZA: 'R', PL: 'zł',
+    AT: '€', CH: 'CHF', JP: '¥', BR: 'R$', MX: 'MX$', MK: 'ден',
+  };
+  function currencySymbol(code) { return CURRENCY_BY_COUNTRY[code] || ''; }
+
   // Breakdown of registered accounts by language/location — computed
   // client-side from the same usersData.users the table below already has,
   // no separate endpoint needed. "Not set" covers pre-LanguageGate accounts
@@ -1215,7 +1249,7 @@
     btn.disabled = true;
     btn.textContent = '↻ Refreshing…';
     try {
-      const results = await Promise.allSettled([loadUsers(), loadDevices(), loadKits(), loadSpend(), loadCalls(), loadUptake(), loadRevenue(), loadProfit(), loadSuggestions(), loadTesters(), loadQrScans(), loadSiteVisits(), loadGrowthStats(), loadWinbackOffers(), loadAppConfig(), loadKillSwitchAlerts(), loadForumContent(), loadRecipeBoard(), loadBlockedNames(), loadCancellationFeedback(), loadMailingList()]);
+      const results = await Promise.allSettled([loadUsers(), loadDevices(), loadKits(), loadSpend(), loadCalls(), loadUptake(), loadRevenue(), loadProfit(), loadSuggestions(), loadTesters(), loadQrScans(), loadSiteVisits(), loadGrowthStats(), loadWinbackOffers(), loadAppConfig(), loadKillSwitchAlerts(), loadForumContent(), loadRecipeBoard(), loadBlockedNames(), loadCancellationFeedback(), loadMailingList(), loadRetailerCatalog()]);
       const failed = results.filter((r) => r.status === 'rejected');
       if (failed.length > 0) {
         console.error('refreshAll: sections that failed to load', failed);
@@ -1286,6 +1320,79 @@ There is a separate persistent memory system at C:\\Users\\GM\\.claude\\projects
 
 === WHAT TO DO NOW ===
 Don't assume this prompt is fully current — spot-check anything you're about to rely on (BUILD_VERSION, submission status, monetization gates) against the real code/dashboard/App Store Connect before acting on it, then ask the user what they want to work on next.`;
+
+  let retailerCatalogSummary = null;
+
+  async function loadRetailerCatalog() {
+    try {
+      retailerCatalogSummary = (await call('list_retailer_catalog')).retailers;
+      renderRetailerCatalogSummary();
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  function renderRetailerCatalogSummary() {
+    const tbody = document.getElementById('retailerCatalogSummaryBody');
+    if (!retailerCatalogSummary || !retailerCatalogSummary.length) {
+      tbody.innerHTML = '<tr><td colspan="5" class="empty-note">No retailer catalog data yet — run scripts/backfill-ingredient-catalog.mjs for a country.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = retailerCatalogSummary.map((r) => {
+      const pct = r.totalChecked ? Math.round((r.totalMatched / r.totalChecked) * 100) : 0;
+      const matchClass = pct >= 30 ? 'active' : pct > 0 ? 'quiet' : 'stale';
+      return (
+        '<tr>' +
+        '<td>' + countryLabel(r.country) + '</td>' +
+        '<td>' + r.retailerDomain + '</td>' +
+        '<td><span class="pill ' + matchClass + '">' + r.totalMatched + ' / ' + r.totalChecked + ' (' + pct + '%)</span></td>' +
+        '<td>' + fmtDate(r.lastCheckedAt) + '</td>' +
+        '<td><button class="btn-sm" onclick="openRetailerCatalogDetail(' + JSON.stringify(r.country) + ',' + JSON.stringify(r.retailerDomain) + ')">View items</button></td>' +
+        '</tr>'
+      );
+    }).join('');
+  }
+
+  async function openRetailerCatalogDetail(country, retailerDomain) {
+    document.getElementById('retailerCatalogSummaryView').style.display = 'none';
+    const detailView = document.getElementById('retailerCatalogDetailView');
+    detailView.style.display = 'block';
+    document.getElementById('retailerCatalogDetailTitle').textContent = retailerDomain + ' — ' + countryLabel(country);
+    const tbody = document.getElementById('retailerCatalogDetailBody');
+    tbody.innerHTML = '<tr><td colspan="6" class="empty-note">Loading…</td></tr>';
+    try {
+      const { items } = await call('list_retailer_catalog', { country, retailer_domain: retailerDomain });
+      if (!items.length) {
+        tbody.innerHTML = '<tr><td colspan="6" class="empty-note">No items recorded for this retailer.</td></tr>';
+        return;
+      }
+      const sym = currencySymbol(country);
+      tbody.innerHTML = items.map((it) => {
+        const productCell = it.matched
+          ? (it.last_url
+              ? '<a href="' + it.last_url + '" target="_blank" rel="noopener">' + (it.last_title || it.last_url) + '</a>'
+              : (it.last_title || '—'))
+          : '—';
+        return (
+          '<tr>' +
+          '<td>' + it.search_term + '</td>' +
+          '<td><span class="pill ' + (it.matched ? 'active' : 'stale') + '">' + (it.matched ? 'Yes' : 'No') + '</span></td>' +
+          '<td>' + productCell + '</td>' +
+          '<td>' + (it.last_price ? sym + it.last_price : '—') + '</td>' +
+          '<td>' + (it.last_available === null ? '—' : it.last_available ? 'Yes' : 'No') + '</td>' +
+          '<td>' + fmtDate(it.checked_at) + '</td>' +
+          '</tr>'
+        );
+      }).join('');
+    } catch (e) {
+      tbody.innerHTML = '<tr><td colspan="6" class="empty-note">Failed to load: ' + e.message + '</td></tr>';
+    }
+  }
+
+  function closeRetailerCatalogDetail() {
+    document.getElementById('retailerCatalogDetailView').style.display = 'none';
+    document.getElementById('retailerCatalogSummaryView').style.display = 'block';
+  }
 
   function renderContinuityPrompt() {
     const el = document.getElementById('continuityPromptBox');
