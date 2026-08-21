@@ -453,6 +453,7 @@
   .modal .modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
 
   .footnote { color: var(--muted); font-size: 11.5px; margin-top: 10px; line-height: 1.5; }
+  .report-text { white-space: pre-wrap; word-wrap: break-word; background: var(--bg-panel); border: 1px solid var(--border); border-radius: 10px; padding: 16px; font-family: inherit; font-size: 13.5px; line-height: 1.6; max-height: 70vh; overflow-y: auto; }
   .kill-switch-banner {
     background: rgba(224,96,79,0.1);
     border: 1px solid rgba(224,96,79,0.4);
@@ -555,6 +556,12 @@
         <div class="tab-group-label">Tools</div>
         <button class="tab-btn" data-tab="retailercatalog" data-label="Retailer Catalog">Retailer Catalog</button>
         <button class="tab-btn" data-tab="claudeprompt" data-label="Claude Continuity">Claude Continuity</button>
+      </div>
+      <div class="tab-group">
+        <div class="tab-group-label">AI &amp; Usage</div>
+        <button class="tab-btn" data-tab="aicalllog" data-label="AI Call Log">AI Call Log</button>
+        <button class="tab-btn" data-tab="featureusage" data-label="Feature Usage">Feature Usage</button>
+        <button class="tab-btn" data-tab="aireports" data-label="AI Reports">AI Reports</button>
       </div>
     </div>
     <div class="tabs-drawer-backdrop" id="tabsDrawerBackdrop"></div>
@@ -979,6 +986,63 @@
       </div>
     </section>
 
+    <!-- AI CALL LOG -->
+    <section class="panel" id="panel-aicalllog">
+      <div class="footnote" style="margin-bottom:16px;">
+        Every AI call's full prompt and response, for reviewing real usage and spotting misuse — separate from
+        the lightweight cost/token log the spend chart uses. Auto-purged after 90 days. Click a row to see the
+        full prompt/response text.
+      </div>
+      <div id="aiCallLogListView">
+        <table class="data-table">
+          <thead><tr><th>When</th><th>Feature</th><th>Tier</th><th>Model</th><th>Cost</th><th>Device</th></tr></thead>
+          <tbody id="aiCallLogBody"><tr><td colspan="6" class="empty-note">Loading…</td></tr></tbody>
+        </table>
+      </div>
+      <div id="aiCallLogDetailView" style="display:none;">
+        <button class="btn-sm" onclick="closeAiCallDetail()" style="margin-bottom:14px;">← Back to call log</button>
+        <h2 class="section-title" id="aiCallDetailTitle" style="margin-top:0;"></h2>
+        <div class="footnote" style="margin-bottom:6px;">Prompt</div>
+        <pre id="aiCallDetailPrompt" class="report-text"></pre>
+        <div class="footnote" style="margin:16px 0 6px;">Response</div>
+        <pre id="aiCallDetailResponse" class="report-text"></pre>
+      </div>
+    </section>
+
+    <!-- FEATURE USAGE -->
+    <section class="panel" id="panel-featureusage">
+      <div class="footnote" style="margin-bottom:16px;">
+        % of active devices (last 7 days) that visited each screen at least once — a device visiting a screen
+        50 times counts the same as once, since this is about reach, not raw traffic volume.
+      </div>
+      <div id="featureUsageTotal" style="margin-bottom:14px; font-weight:600;"></div>
+      <table class="data-table">
+        <thead><tr><th>Screen</th><th>Active devices</th><th>% of active users</th></tr></thead>
+        <tbody id="featureUsageBody"><tr><td colspan="3" class="empty-note">Loading…</td></tr></tbody>
+      </table>
+    </section>
+
+    <!-- AI REPORTS -->
+    <section class="panel" id="panel-aireports">
+      <div class="footnote" style="margin-bottom:16px;">
+        AI-written weekly/monthly summaries covering misuse signals, popular recipe-tweak request themes, and
+        feature-usage highlights — generated automatically every Monday (weekly) and on the 1st of the month
+        (monthly), or on demand below.
+      </div>
+      <button class="btn-sm" id="generateReportBtn" onclick="generateAiReport()" style="margin-bottom:16px;">Generate report now</button>
+      <div id="aiReportsListView">
+        <table class="data-table">
+          <thead><tr><th>Generated</th><th>Type</th><th>Period</th><th></th></tr></thead>
+          <tbody id="aiReportsBody"><tr><td colspan="4" class="empty-note">Loading…</td></tr></tbody>
+        </table>
+      </div>
+      <div id="aiReportDetailView" style="display:none; margin-top:16px;">
+        <button class="btn-sm" onclick="closeAiReportDetail()" style="margin-bottom:14px;">← Back to reports</button>
+        <h2 class="section-title" id="aiReportDetailTitle" style="margin-top:0;"></h2>
+        <pre id="aiReportDetailText" class="report-text"></pre>
+      </div>
+    </section>
+
     <!-- CLAUDE CONTINUITY -->
     <section class="panel" id="panel-claudeprompt">
       <div class="footnote" style="margin-bottom:16px;">
@@ -1257,7 +1321,7 @@
     btn.disabled = true;
     btn.textContent = '↻ Refreshing…';
     try {
-      const results = await Promise.allSettled([loadUsers(), loadDevices(), loadKits(), loadSpend(), loadCalls(), loadUptake(), loadRevenue(), loadProfit(), loadSuggestions(), loadTesters(), loadQrScans(), loadSiteVisits(), loadGrowthStats(), loadWinbackOffers(), loadAppConfig(), loadKillSwitchAlerts(), loadForumContent(), loadRecipeBoard(), loadBlockedNames(), loadCancellationFeedback(), loadMailingList(), loadRetailerCatalog()]);
+      const results = await Promise.allSettled([loadUsers(), loadDevices(), loadKits(), loadSpend(), loadCalls(), loadUptake(), loadRevenue(), loadProfit(), loadSuggestions(), loadTesters(), loadQrScans(), loadSiteVisits(), loadGrowthStats(), loadWinbackOffers(), loadAppConfig(), loadKillSwitchAlerts(), loadForumContent(), loadRecipeBoard(), loadBlockedNames(), loadCancellationFeedback(), loadMailingList(), loadRetailerCatalog(), loadAiCallLog(), loadFeatureUsage(), loadAiReports()]);
       const failed = results.filter((r) => r.status === 'rejected');
       if (failed.length > 0) {
         console.error('refreshAll: sections that failed to load', failed);
@@ -1458,6 +1522,137 @@ Don't assume this prompt is fully current — spot-check anything you're about t
   function closeRetailerCatalogDetail() {
     document.getElementById('retailerCatalogDetailView').style.display = 'none';
     document.getElementById('retailerCatalogSummaryView').style.display = 'block';
+  }
+
+  // --- AI CALL LOG ---
+  let aiCallLogData = null;
+
+  async function loadAiCallLog() {
+    try {
+      aiCallLogData = (await call('list_ai_call_log')).calls;
+      renderAiCallLog();
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  function renderAiCallLog() {
+    const tbody = document.getElementById('aiCallLogBody');
+    if (!aiCallLogData || !aiCallLogData.length) {
+      tbody.innerHTML = '<tr><td colspan="6" class="empty-note">No AI calls logged yet.</td></tr>';
+      return;
+    }
+    // Index-based onclick (a plain number needs no quoting at all) rather
+    // than embedding any string value in the attribute — sidesteps the
+    // quoting bug class entirely (see the Retailer Catalog fix above).
+    tbody.innerHTML = aiCallLogData.map((c, i) =>
+      '<tr onclick="openAiCallDetail(' + i + ')" style="cursor:pointer;">' +
+      '<td>' + fmtDateTime(c.created_at) + '</td>' +
+      '<td>' + (c.feature || '—') + '</td>' +
+      '<td>' + (c.tier || '—') + '</td>' +
+      '<td>' + (c.model || '—') + '</td>' +
+      '<td>' + fmtUsd(c.estimated_cost_usd) + '</td>' +
+      '<td style="font-size:11px; color:var(--muted);">' + c.device_id.slice(0, 12) + '…</td>' +
+      '</tr>'
+    ).join('');
+  }
+
+  function openAiCallDetail(index) {
+    const c = aiCallLogData[index];
+    document.getElementById('aiCallLogListView').style.display = 'none';
+    document.getElementById('aiCallLogDetailView').style.display = 'block';
+    document.getElementById('aiCallDetailTitle').textContent =
+      (c.feature || 'unmetered') + ' — ' + (c.tier || '—') + ' — ' + fmtDateTime(c.created_at);
+    document.getElementById('aiCallDetailPrompt').textContent = c.prompt_text || '(no prompt text captured)';
+    document.getElementById('aiCallDetailResponse').textContent = c.response_text || '(no plain-text response — likely a structured/tool-use reply)';
+  }
+
+  function closeAiCallDetail() {
+    document.getElementById('aiCallLogDetailView').style.display = 'none';
+    document.getElementById('aiCallLogListView').style.display = 'block';
+  }
+
+  // --- FEATURE USAGE ---
+  async function loadFeatureUsage() {
+    try {
+      const result = await call('feature_usage_percentages');
+      renderFeatureUsage(result);
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  function renderFeatureUsage(result) {
+    document.getElementById('featureUsageTotal').textContent =
+      result.totalActiveDevices + ' distinct active device(s) in the last ' + result.days + ' days';
+    const tbody = document.getElementById('featureUsageBody');
+    if (!result.screens || !result.screens.length) {
+      tbody.innerHTML = '<tr><td colspan="3" class="empty-note">No screen-view data recorded yet.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = result.screens.map((s) =>
+      '<tr>' +
+      '<td>' + s.screenName + '</td>' +
+      '<td>' + s.activeDevices + ' / ' + s.totalActiveDevices + '</td>' +
+      '<td><span class="pill ' + (s.percent >= 50 ? 'active' : s.percent > 0 ? 'quiet' : 'stale') + '">' + s.percent + '%</span></td>' +
+      '</tr>'
+    ).join('');
+  }
+
+  // --- AI REPORTS ---
+  let aiReportsData = null;
+
+  async function loadAiReports() {
+    try {
+      aiReportsData = (await call('list_ai_reports')).reports;
+      renderAiReports();
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  function renderAiReports() {
+    const tbody = document.getElementById('aiReportsBody');
+    if (!aiReportsData || !aiReportsData.length) {
+      tbody.innerHTML = '<tr><td colspan="4" class="empty-note">No reports generated yet — click "Generate report now" above.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = aiReportsData.map((r, i) =>
+      '<tr>' +
+      '<td>' + fmtDateTime(r.generated_at) + '</td>' +
+      '<td>' + r.period_type + '</td>' +
+      '<td>' + r.period_start + ' → ' + r.period_end + '</td>' +
+      '<td><button class="btn-sm" onclick="openAiReportDetail(' + i + ')">View</button></td>' +
+      '</tr>'
+    ).join('');
+  }
+
+  function openAiReportDetail(index) {
+    const r = aiReportsData[index];
+    document.getElementById('aiReportsListView').style.display = 'none';
+    document.getElementById('aiReportDetailView').style.display = 'block';
+    document.getElementById('aiReportDetailTitle').textContent = r.period_type + ' report — ' + r.period_start + ' → ' + r.period_end;
+    document.getElementById('aiReportDetailText').textContent = r.report_text;
+  }
+
+  function closeAiReportDetail() {
+    document.getElementById('aiReportDetailView').style.display = 'none';
+    document.getElementById('aiReportsListView').style.display = 'block';
+  }
+
+  async function generateAiReport() {
+    const btn = document.getElementById('generateReportBtn');
+    btn.disabled = true;
+    btn.textContent = 'Generating… (this calls Claude and can take a moment)';
+    try {
+      await call('generate_ai_report');
+      await loadAiReports();
+    } catch (e) {
+      alert('Report generation failed: ' + e.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Generate report now';
+    }
   }
 
   function renderContinuityPrompt() {
