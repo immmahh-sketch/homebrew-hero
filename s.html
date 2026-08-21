@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A shared recipe — Homebrew Hero</title>
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,500;0,600;0,700;1,500;1,600&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🍺</text></svg>">
+<style>
+  .share-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
+  .share-card { max-width: 440px; width: 100%; background: var(--card); border: 1px solid var(--border); border-radius: 20px; padding: 36px 28px; text-align: center; }
+  .share-mug { font-size: 40px; margin-bottom: 6px; }
+  .share-eyebrow { display: inline-block; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-faint); margin-bottom: 10px; }
+  .share-name { font-size: 26px; margin-bottom: 6px; }
+  .share-meta { color: var(--text-muted); font-size: 14.5px; margin-bottom: 24px; }
+  .share-status { color: var(--text-faint); font-size: 14px; margin-bottom: 20px; }
+  .share-badges { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
+  .spinner { width: 22px; height: 22px; border-radius: 50%; border: 3px solid var(--border); border-top-color: var(--amber); margin: 0 auto 18px; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<header class="site">
+  <div class="wrap">
+    <a href="index.html" class="logo">
+      <span class="mug">🍺</span>
+      <span><span class="word-home">Homebrew</span> <span class="word-hero">Hero</span></span>
+    </a>
+  </div>
+</header>
+
+<div class="share-wrap">
+  <div class="share-card" id="card">
+    <div class="spinner"></div>
+    <p class="share-status">Loading the shared recipe…</p>
+  </div>
+</div>
+
+<script>
+(function () {
+  const card = document.getElementById('card');
+  const params = new URLSearchParams(location.search);
+  const code = params.get('c');
+
+  function renderError() {
+    card.innerHTML =
+      '<div class="share-mug">🍺</div>' +
+      '<h1 class="share-name">This link has expired</h1>' +
+      '<p class="share-meta">The recipe it pointed to could not be found. Ask whoever shared it to send a fresh link.</p>' +
+      '<div class="share-badges">' +
+      '<a href="index.html" class="btn btn-amber">Visit Homebrew Hero</a>' +
+      '</div>';
+  }
+
+  function renderRecipe(payload) {
+    const metaParts = [payload.style, payload.batchSizeLiters ? payload.batchSizeLiters + 'L' : null, payload.abv ? payload.abv + '% ABV' : null].filter(Boolean);
+    card.innerHTML =
+      '<div class="share-mug">🍺</div>' +
+      '<span class="share-eyebrow">Shared recipe</span>' +
+      '<h1 class="share-name">' + escapeHtml(payload.name || 'A brew recipe') + '</h1>' +
+      '<p class="share-meta">' + escapeHtml(metaParts.join(' · ')) + '</p>' +
+      '<p class="share-status" id="handoffStatus">Opening in Homebrew Hero…</p>' +
+      '<div class="share-badges">' +
+      '<a href="#" id="openAppBtn" class="btn btn-amber">Open in Homebrew Hero</a>' +
+      '<a href="index.html#get-app" class="btn btn-outline">Don’t have the app? Get it here</a>' +
+      '</div>';
+
+    const deepLink = 'homebrewhero://recipe?data=' + encodeURIComponent(JSON.stringify(payload));
+    document.getElementById('openAppBtn').addEventListener('click', function (e) {
+      e.preventDefault();
+      window.location.href = deepLink;
+    });
+
+    // Try the handoff automatically once — if the app is installed, the OS
+    // hands off immediately and this tab never regains focus. If nothing
+    // happens within a couple seconds, the app almost certainly isn't
+    // installed, so swap the status line to point at the install button
+    // instead of leaving "Opening…" up forever.
+    window.location.href = deepLink;
+    setTimeout(function () {
+      const status = document.getElementById('handoffStatus');
+      if (status) status.textContent = 'Don’t have the app installed yet? Grab it below.';
+    }, 2000);
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = String(str == null ? '' : str);
+    return div.innerHTML;
+  }
+
+  if (!code) {
+    renderError();
+  } else {
+    fetch('https://qrihcvanmkdsaojuhasm.supabase.co/functions/v1/share-recipe', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ action: 'get', code: code }),
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data && data.payload) renderRecipe(data.payload);
+        else renderError();
+      })
+      .catch(renderError);
+  }
+})();
+</script>
+
+<script>(function(){var u="https://qrihcvanmkdsaojuhasm.supabase.co/functions/v1/track-visit";var d=JSON.stringify({path:location.pathname,referrer:document.referrer||null});if(navigator.sendBeacon){navigator.sendBeacon(u,new Blob([d],{type:"application/json"}));}else{fetch(u,{method:"POST",headers:{"Content-Type":"application/json"},body:d,keepalive:true}).catch(function(){});}})();</script>
+</body>
+</html>
