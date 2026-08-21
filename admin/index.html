@@ -1378,7 +1378,7 @@ Don't assume this prompt is fully current — spot-check anything you're about t
         '<tr>' +
         '<td>' + countryLabel(country) + '</td>' +
         '<td>' + rows.length + '</td>' +
-        '<td><button class="btn-sm" onclick="openRetailerCatalogCountry(' + JSON.stringify(country) + ')">View suppliers</button></td>' +
+        '<td><button class="btn-sm" onclick=\'openRetailerCatalogCountry(' + JSON.stringify(country) + ')\'>View suppliers</button></td>' +
         '</tr>'
       );
     }).join('');
@@ -1404,7 +1404,7 @@ Don't assume this prompt is fully current — spot-check anything you're about t
         '<td>' + r.retailerDomain + '</td>' +
         '<td><span class="pill ' + matchClass + '">' + r.totalMatched + ' / ' + r.totalChecked + '</span></td>' +
         '<td>' + fmtDate(r.lastCheckedAt) + '</td>' +
-        '<td><button class="btn-sm" onclick="openRetailerCatalogDetail(' + JSON.stringify(country) + ',' + JSON.stringify(r.retailerDomain) + ')">View items</button></td>' +
+        '<td><button class="btn-sm" onclick=\'openRetailerCatalogDetail(' + JSON.stringify(country) + ',' + JSON.stringify(r.retailerDomain) + ')\'>View items</button></td>' +
         '</tr>'
       );
     }).join('');
