@@ -955,17 +955,25 @@
         is how many of the retailer's checked search terms found a real product; click a row to see the
         exact items, prices, and when each was last checked.
       </div>
-      <div id="retailerCatalogSummaryView">
+      <div id="retailerCatalogCountryView">
         <table class="data-table">
-          <thead><tr><th>Country</th><th>Retailer</th><th>Matched</th><th>Last Checked</th><th></th></tr></thead>
-          <tbody id="retailerCatalogSummaryBody"><tr><td colspan="5" class="empty-note">Loading…</td></tr></tbody>
+          <thead><tr><th>Country</th><th>Suppliers</th><th></th></tr></thead>
+          <tbody id="retailerCatalogCountryBody"><tr><td colspan="3" class="empty-note">Loading…</td></tr></tbody>
+        </table>
+      </div>
+      <div id="retailerCatalogSummaryView" style="display:none;">
+        <button class="btn-sm" onclick="closeRetailerCatalogCountry()" style="margin-bottom:14px;">← Back to all countries</button>
+        <h2 class="section-title" id="retailerCatalogCountryTitle" style="margin-top:0;"></h2>
+        <table class="data-table">
+          <thead><tr><th>Supplier</th><th>Items found</th><th>Last Checked</th><th></th></tr></thead>
+          <tbody id="retailerCatalogSummaryBody"><tr><td colspan="4" class="empty-note">Loading…</td></tr></tbody>
         </table>
       </div>
       <div id="retailerCatalogDetailView" style="display:none;">
-        <button class="btn-sm" onclick="closeRetailerCatalogDetail()" style="margin-bottom:14px;">← Back to all retailers</button>
+        <button class="btn-sm" onclick="closeRetailerCatalogDetail()" style="margin-bottom:14px;">← Back to suppliers</button>
         <h2 class="section-title" id="retailerCatalogDetailTitle" style="margin-top:0;"></h2>
         <table class="data-table">
-          <thead><tr><th>Search term</th><th>Matched</th><th>Product</th><th>Price</th><th>Available</th><th>Checked</th></tr></thead>
+          <thead><tr><th>Item</th><th>Price</th><th>Last checked</th></tr></thead>
           <tbody id="retailerCatalogDetailBody"></tbody>
         </table>
       </div>
@@ -1327,70 +1335,108 @@ There is a separate persistent memory system at C:\\Users\\GM\\.claude\\projects
 Don't assume this prompt is fully current — spot-check anything you're about to rely on (BUILD_VERSION, submission status, monetization gates) against the real code/dashboard/App Store Connect before acting on it, then ask the user what they want to work on next.`;
 
   let retailerCatalogSummary = null;
+  let retailerCatalogCurrentCountry = null;
+
+  function fmtDateTime(iso) {
+    if (!iso) return '—';
+    return new Date(iso).toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  }
 
   async function loadRetailerCatalog() {
     try {
       retailerCatalogSummary = (await call('list_retailer_catalog')).retailers;
-      renderRetailerCatalogSummary();
+      renderRetailerCatalogCountries();
     } catch (e) {
       console.error(e);
     }
   }
 
-  function renderRetailerCatalogSummary() {
-    const tbody = document.getElementById('retailerCatalogSummaryBody');
+  // Level 1: one row per country, supplier count only.
+  function renderRetailerCatalogCountries() {
+    const tbody = document.getElementById('retailerCatalogCountryBody');
     if (!retailerCatalogSummary || !retailerCatalogSummary.length) {
-      tbody.innerHTML = '<tr><td colspan="5" class="empty-note">No retailer catalog data yet — run scripts/backfill-ingredient-catalog.mjs for a country.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="3" class="empty-note">No retailer catalog data yet — run scripts/backfill-ingredient-catalog.mjs for a country.</td></tr>';
       return;
     }
-    tbody.innerHTML = retailerCatalogSummary.map((r) => {
-      const pct = r.totalChecked ? Math.round((r.totalMatched / r.totalChecked) * 100) : 0;
-      const matchClass = pct >= 30 ? 'active' : pct > 0 ? 'quiet' : 'stale';
+    const byCountry = new Map();
+    for (const r of retailerCatalogSummary) {
+      if (!byCountry.has(r.country)) byCountry.set(r.country, []);
+      byCountry.get(r.country).push(r);
+    }
+    const countries = [...byCountry.keys()].sort((a, b) => countryLabel(a).localeCompare(countryLabel(b)));
+    tbody.innerHTML = countries.map((country) => {
+      const rows = byCountry.get(country);
       return (
         '<tr>' +
-        '<td>' + countryLabel(r.country) + '</td>' +
-        '<td>' + r.retailerDomain + '</td>' +
-        '<td><span class="pill ' + matchClass + '">' + r.totalMatched + ' / ' + r.totalChecked + ' (' + pct + '%)</span></td>' +
-        '<td>' + fmtDate(r.lastCheckedAt) + '</td>' +
-        '<td><button class="btn-sm" onclick="openRetailerCatalogDetail(' + JSON.stringify(r.country) + ',' + JSON.stringify(r.retailerDomain) + ')">View items</button></td>' +
+        '<td>' + countryLabel(country) + '</td>' +
+        '<td>' + rows.length + '</td>' +
+        '<td><button class="btn-sm" onclick="openRetailerCatalogCountry(' + JSON.stringify(country) + ')">View suppliers</button></td>' +
         '</tr>'
       );
     }).join('');
   }
 
+  // Level 2: suppliers within one country, items-found count.
+  function openRetailerCatalogCountry(country) {
+    retailerCatalogCurrentCountry = country;
+    document.getElementById('retailerCatalogCountryView').style.display = 'none';
+    document.getElementById('retailerCatalogSummaryView').style.display = 'block';
+    document.getElementById('retailerCatalogCountryTitle').textContent = countryLabel(country);
+    const tbody = document.getElementById('retailerCatalogSummaryBody');
+    const rows = (retailerCatalogSummary || []).filter((r) => r.country === country)
+      .sort((a, b) => b.totalMatched - a.totalMatched);
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="4" class="empty-note">No suppliers recorded for this country.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = rows.map((r) => {
+      const matchClass = r.totalMatched >= 30 ? 'active' : r.totalMatched > 0 ? 'quiet' : 'stale';
+      return (
+        '<tr>' +
+        '<td>' + r.retailerDomain + '</td>' +
+        '<td><span class="pill ' + matchClass + '">' + r.totalMatched + ' / ' + r.totalChecked + '</span></td>' +
+        '<td>' + fmtDate(r.lastCheckedAt) + '</td>' +
+        '<td><button class="btn-sm" onclick="openRetailerCatalogDetail(' + JSON.stringify(country) + ',' + JSON.stringify(r.retailerDomain) + ')">View items</button></td>' +
+        '</tr>'
+      );
+    }).join('');
+  }
+
+  function closeRetailerCatalogCountry() {
+    document.getElementById('retailerCatalogSummaryView').style.display = 'none';
+    document.getElementById('retailerCatalogCountryView').style.display = 'block';
+  }
+
+  // Level 3: items actually found at one supplier, with price + last-checked date/time.
   async function openRetailerCatalogDetail(country, retailerDomain) {
     document.getElementById('retailerCatalogSummaryView').style.display = 'none';
     const detailView = document.getElementById('retailerCatalogDetailView');
     detailView.style.display = 'block';
     document.getElementById('retailerCatalogDetailTitle').textContent = retailerDomain + ' — ' + countryLabel(country);
     const tbody = document.getElementById('retailerCatalogDetailBody');
-    tbody.innerHTML = '<tr><td colspan="6" class="empty-note">Loading…</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="3" class="empty-note">Loading…</td></tr>';
     try {
       const { items } = await call('list_retailer_catalog', { country, retailer_domain: retailerDomain });
-      if (!items.length) {
-        tbody.innerHTML = '<tr><td colspan="6" class="empty-note">No items recorded for this retailer.</td></tr>';
+      const found = items.filter((it) => it.matched);
+      if (!found.length) {
+        tbody.innerHTML = '<tr><td colspan="3" class="empty-note">No items found at this supplier yet.</td></tr>';
         return;
       }
       const sym = currencySymbol(country);
-      tbody.innerHTML = items.map((it) => {
-        const productCell = it.matched
-          ? (it.last_url
-              ? '<a href="' + it.last_url + '" target="_blank" rel="noopener">' + (it.last_title || it.last_url) + '</a>'
-              : (it.last_title || '—'))
-          : '—';
+      tbody.innerHTML = found.map((it) => {
+        const productCell = it.last_url
+          ? '<a href="' + it.last_url + '" target="_blank" rel="noopener">' + (it.last_title || it.search_term) + '</a>'
+          : (it.last_title || it.search_term);
         return (
           '<tr>' +
-          '<td>' + it.search_term + '</td>' +
-          '<td><span class="pill ' + (it.matched ? 'active' : 'stale') + '">' + (it.matched ? 'Yes' : 'No') + '</span></td>' +
           '<td>' + productCell + '</td>' +
           '<td>' + (it.last_price ? sym + it.last_price : '—') + '</td>' +
-          '<td>' + (it.last_available === null ? '—' : it.last_available ? 'Yes' : 'No') + '</td>' +
-          '<td>' + fmtDate(it.checked_at) + '</td>' +
+          '<td>' + fmtDateTime(it.checked_at) + '</td>' +
           '</tr>'
         );
       }).join('');
     } catch (e) {
-      tbody.innerHTML = '<tr><td colspan="6" class="empty-note">Failed to load: ' + e.message + '</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="3" class="empty-note">Failed to load: ' + e.message + '</td></tr>';
     }
   }
 
