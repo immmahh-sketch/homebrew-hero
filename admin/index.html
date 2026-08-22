@@ -1881,6 +1881,7 @@ Don't assume this prompt is fully current — spot-check anything you're about t
     const els = document.querySelectorAll('.app-config-card');
     if (!appConfigData) { els.forEach((el) => { el.innerHTML = '<div class="load-note">Loading…</div>'; }); return; }
     const on = appConfigData.testerAutoGrantEnabled;
+    const lenientOn = appConfigData.iapLenientMode;
     const html =
       '<div style="display:flex; align-items:center; justify-content:space-between;">' +
       '<div>' +
@@ -1888,6 +1889,13 @@ Don't assume this prompt is fully current — spot-check anything you're about t
       '<div class="meta">' + (on ? 'New sign-ins get a free 6-month Power User grant.' : 'New sign-ins hit the real paywall — testing auto-grant is closed.') + '</div>' +
       '</div>' +
       '<button class="btn-sm ' + (on ? 'danger' : 'safe') + '" onclick="toggleTesterAutoGrant()">' + (on ? 'Turn OFF (launch)' : 'Turn ON (testing)') + '</button>' +
+      '</div>' +
+      '<div style="display:flex; align-items:center; justify-content:space-between; margin-top:12px; padding-top:12px; border-top:1px solid rgba(255,255,255,0.08);">' +
+      '<div>' +
+      '<div class="name">App Review test-purchase leniency is <span class="pill ' + (lenientOn ? 'active' : 'stale') + '">' + (lenientOn ? 'ON' : 'OFF') + '</span></div>' +
+      '<div class="meta">' + (lenientOn ? 'A test purchase still grants premium even if Apple/Google verification fails — for App Review only.' : 'Failed purchase verification now denies premium for real, no test fallback.') + '</div>' +
+      '</div>' +
+      '<button class="btn-sm ' + (lenientOn ? 'danger' : 'safe') + '" onclick="toggleIapLenientMode()">' + (lenientOn ? 'Turn OFF (launch)' : 'Turn ON (testing)') + '</button>' +
       '</div>';
     els.forEach((el) => { el.innerHTML = html; });
   }
@@ -1900,6 +1908,18 @@ Don't assume this prompt is fully current — spot-check anything you're about t
     try {
       await call('set_app_config', { testerAutoGrantEnabled: next });
       appConfigData.testerAutoGrantEnabled = next;
+      renderAppConfig();
+    } catch (e) { alert('Failed: ' + e.message); }
+  }
+
+  async function toggleIapLenientMode() {
+    if (!appConfigData) return;
+    const next = !appConfigData.iapLenientMode;
+    const verb = next ? 'turn test-purchase leniency back ON (App Review testing)' : 'turn test-purchase leniency OFF — do this before public launch, so a failed Apple/Google verification denies premium for real instead of granting it anyway';
+    if (!confirm('Are you sure you want to ' + verb + '?')) return;
+    try {
+      await call('set_app_config', { iapLenientMode: next });
+      appConfigData.iapLenientMode = next;
       renderAppConfig();
     } catch (e) { alert('Failed: ' + e.message); }
   }
