@@ -611,21 +611,34 @@
         whether that was a real purchase or the free tester grant, since there's no real billing yet to tell them apart.
       </div>
 
-      <h2 class="section-title">Revenue — last 4 months, by day</h2>
+      <h2 class="section-title">Revenue (GBP) — last 4 months, by day</h2>
       <div class="chart-wrap">
         <div class="bar-chart" id="revenueChart"><div class="load-note">Loading…</div></div>
       </div>
       <div class="footnote" id="revenueFootnote" style="margin-bottom:22px;"></div>
 
-      <h2 class="section-title">Profit / loss — real AI spend minus real revenue, by day</h2>
+      <h2 class="section-title">AI cost (USD) — last 4 months, by day</h2>
       <div class="chart-wrap">
         <div class="bar-chart" id="profitChart"><div class="load-note">Loading…</div></div>
       </div>
       <div class="footnote">
-        Bars below the line are a net loss that day (spend with no offsetting revenue), bars above are a net profit.
-        This is a genuinely working chart, not a placeholder — it'll show real profit the moment real purchases land
-        in payment_events, with no further changes needed here.
+        Shown separately from revenue above rather than combined into one "profit" figure — revenue is GBP (the
+        app's real subscription prices) and AI cost is USD (what Anthropic actually bills), and there's no live
+        exchange rate wired up here to convert between them. Subtracting one from the other as-is would be a real
+        bug, not just an approximation, so this deliberately stays two numbers.
       </div>
+
+      <h2 class="section-title" style="margin-top:22px;">Spend per device — who's actually paying</h2>
+      <div class="footnote" style="margin-bottom:10px;">
+        Every device with any premium involvement — a real purchase ever, a currently active verified subscription,
+        or an admin/tester grant. GBP spend comes only from genuinely verified purchases (see verify-purchase /
+        verify-purchase-ios) — a device showing £0 across all three columns despite having premium access got it
+        for free (admin grant, tester mode, or the App Review test-purchase leniency), not by paying.
+      </div>
+      <table class="data-table">
+        <thead><tr><th>Email</th><th>Device</th><th>30d spend</th><th>60d spend</th><th>Lifetime spend</th><th>Active days (30d)</th><th>Premium via</th></tr></thead>
+        <tbody id="deviceSpendBody"><tr><td colspan="7" class="load-note">Loading…</td></tr></tbody>
+      </table>
 
       <h2 class="section-title" style="margin-top:22px;">Cancellation feedback</h2>
       <div class="footnote" style="margin-bottom:10px;">Captured on the way through the in-app cancel-subscription flow, before the brewer is handed off to their App Store/Play Store subscription settings.</div>
@@ -1115,7 +1128,7 @@
 
   let SECRET = localStorage.getItem('hh_admin_secret') || '';
   let usersData = null, devicesData = null, kitsData = null, spendData = null, callsData = null, suggestionsData = null, testersData = null, qrScansData = null, growthData = null, winbackData = null, appConfigData = null, killSwitchData = null, trafficData = null, cancellationFeedbackData = null, mailingListData = null;
-  let uptakeData = null, revenueData = null, profitData = null;
+  let uptakeData = null, revenueData = null, profitData = null, deviceSpendData = null;
   let forumData = null, recipeBoardData = null, blockedNamesData = null;
   let deviceFilter = 'all';
   let callFeatureFilter = 'all';
@@ -1178,6 +1191,7 @@
   });
 
   function fmtUsd(n) { return '$' + n.toFixed(n < 1 ? 4 : 2); }
+  function fmtGbp(n) { return '£' + n.toFixed(n < 1 ? 4 : 2); }
   function fmtDate(iso) { if (!iso) return '—'; return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }); }
 
   // Mirrors src/data/languages.ts's LANGUAGE_OPTIONS and src/data/retailers.ts's
@@ -1336,7 +1350,7 @@
     btn.disabled = true;
     btn.textContent = '↻ Refreshing…';
     try {
-      const results = await Promise.allSettled([loadUsers(), loadDevices(), loadKits(), loadSpend(), loadCalls(), loadUptake(), loadRevenue(), loadProfit(), loadSuggestions(), loadTesters(), loadQrScans(), loadSiteVisits(), loadGrowthStats(), loadWinbackOffers(), loadAppConfig(), loadKillSwitchAlerts(), loadForumContent(), loadRecipeBoard(), loadBlockedNames(), loadCancellationFeedback(), loadMailingList(), loadRetailerCatalog(), loadAiCallLog(), loadFeatureUsage(), loadAiReports()]);
+      const results = await Promise.allSettled([loadUsers(), loadDevices(), loadKits(), loadSpend(), loadCalls(), loadUptake(), loadRevenue(), loadProfit(), loadDeviceSpend(), loadSuggestions(), loadTesters(), loadQrScans(), loadSiteVisits(), loadGrowthStats(), loadWinbackOffers(), loadAppConfig(), loadKillSwitchAlerts(), loadForumContent(), loadRecipeBoard(), loadBlockedNames(), loadCancellationFeedback(), loadMailingList(), loadRetailerCatalog(), loadAiCallLog(), loadFeatureUsage(), loadAiReports()]);
       const failed = results.filter((r) => r.status === 'rejected');
       if (failed.length > 0) {
         console.error('refreshAll: sections that failed to load', failed);
@@ -2026,15 +2040,18 @@ Don't assume this prompt is fully current — spot-check anything you're about t
     try { profitData = await call('profit_loss_summary'); renderProfitChart(); renderRevenueStats(); }
     catch (e) { console.error(e); }
   }
+  async function loadDeviceSpend() {
+    try { deviceSpendData = await call('device_spend_report'); renderDeviceSpend(); }
+    catch (e) { console.error(e); }
+  }
 
   function renderRevenueStats() {
     const el = document.getElementById('revenueStats');
     if (!el) return;
     el.innerHTML = [
       statCard('Current Premium Accounts', uptakeData ? uptakeData.currentPremiumCount : '—'),
-      statCard('Total Revenue (4mo)', revenueData ? fmtUsd(revenueData.totalRevenueUsd) : '—'),
-      statCard('Total AI Cost (4mo)', profitData ? fmtUsd(profitData.totalCostUsd) : '—'),
-      statCard('Net Profit / Loss (4mo)', profitData ? fmtUsd(profitData.totalProfitUsd) : '—', profitData && profitData.totalProfitUsd < 0 ? 'red' : 'green'),
+      statCard('Total Revenue (4mo, GBP)', revenueData ? fmtGbp(revenueData.totalRevenueGbp) : '—'),
+      statCard('Total AI Cost (4mo, USD)', profitData ? fmtUsd(profitData.totalCostUsd) : '—'),
     ].join('');
   }
 
@@ -2051,25 +2068,49 @@ Don't assume this prompt is fully current — spot-check anything you're about t
     const note = document.getElementById('revenueFootnote');
     if (note) {
       note.textContent = revenueData && revenueData.hasAnyPayments
-        ? 'Real revenue from payment_events.'
-        : 'Genuinely $0 — no real purchases exist yet (premium is still a free placeholder toggle during testing). This chart is fully wired up and will start showing real numbers automatically once in-app purchases go live — nothing here needs rebuilding later.';
+        ? 'Real revenue from payment_events, in GBP (the app\'s real subscription prices).'
+        : 'Genuinely £0 — no real purchases exist yet. This chart is fully wired up and will start showing real numbers automatically once a genuine verified purchase lands in payment_events — nothing here needs rebuilding later.';
     }
     renderBarChart(document.getElementById('revenueChart'), revenueData ? revenueData.days : null, {
-      getValue: (d) => d.revenueUsd,
-      formatTip: (d) => fmtDate(d.day) + ': ' + fmtUsd(d.revenueUsd),
-      formatScale: (n) => fmtUsd(n),
+      getValue: (d) => d.revenueGbp,
+      formatTip: (d) => fmtDate(d.day) + ': ' + fmtGbp(d.revenueGbp),
+      formatScale: (n) => fmtGbp(n),
       emptyNote: 'No revenue logged yet — see note below.',
     });
   }
 
   function renderProfitChart() {
     renderBarChart(document.getElementById('profitChart'), profitData ? profitData.days : null, {
-      getValue: (d) => d.profitUsd,
-      formatTip: (d) => fmtDate(d.day) + ': ' + fmtUsd(Math.abs(d.profitUsd)) + ' ' + (d.profitUsd >= 0 ? 'profit' : 'loss'),
+      getValue: (d) => d.costUsd,
+      formatTip: (d) => fmtDate(d.day) + ': ' + fmtUsd(d.costUsd),
       formatScale: (n) => fmtUsd(n),
-      diverging: true,
       emptyNote: 'No data yet.',
     });
+  }
+
+  function renderDeviceSpend() {
+    const body = document.getElementById('deviceSpendBody');
+    if (!body) return;
+    const devices = deviceSpendData ? deviceSpendData.devices : null;
+    if (!devices) { body.innerHTML = '<tr><td colspan="7" class="load-note">Loading…</td></tr>'; return; }
+    if (devices.length === 0) { body.innerHTML = '<tr><td colspan="7" class="load-note">No devices with premium involvement yet.</td></tr>'; return; }
+    body.innerHTML = devices.map((d) => {
+      const via = [];
+      if (d.spendLifetimeGbp > 0) via.push('purchase');
+      if (d.hasAdminGrant) via.push('admin grant');
+      if (d.hasActiveSubscription && d.spendLifetimeGbp <= 0) via.push('active sub (unpaid record)');
+      return (
+        '<tr>' +
+        '<td>' + (d.email ? escapeHtml(d.email) : '—') + '</td>' +
+        '<td style="font-family:monospace; font-size:12px;">' + escapeHtml(d.deviceId.slice(0, 12)) + '…</td>' +
+        '<td>' + fmtGbp(d.spend30dGbp) + '</td>' +
+        '<td>' + fmtGbp(d.spend60dGbp) + '</td>' +
+        '<td>' + fmtGbp(d.spendLifetimeGbp) + '</td>' +
+        '<td>' + d.activeDays30d + '</td>' +
+        '<td>' + (via.length > 0 ? via.join(', ') : '—') + '</td>' +
+        '</tr>'
+      );
+    }).join('');
   }
 
   async function loadCalls() {
