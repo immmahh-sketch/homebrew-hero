@@ -659,9 +659,10 @@
         <div class="load-note">Loading…</div>
       </div>
       <div class="footnote" style="margin-bottom:18px;">
-        There's no automatic closed-testing grant any more — every tester's free premium is given individually via
-        "Give someone free premium" below (set months to 6 for the usual tester allowance). New sign-ins default to
-        the real free tier.
+        There's no automatic closed-testing grant any more — new sign-ins default to the real free tier. Testers reach
+        premium themselves by tapping any tier on the Upgrade screen, which self-serves a free instant unlock while
+        "Free self-serve upgrade" above is ON. Use "Give someone free premium" below only for a specific account you
+        want to grant by hand (e.g. a longer/different allowance, or while that switch is OFF).
       </div>
 
       <div class="grant-box">
@@ -1927,6 +1928,7 @@ Don't assume this prompt is fully current — spot-check anything you're about t
     const els = document.querySelectorAll('.app-config-card');
     if (!appConfigData) { els.forEach((el) => { el.innerHTML = '<div class="load-note">Loading…</div>'; }); return; }
     const lenientOn = appConfigData.iapLenientMode;
+    const freeUnlockOn = appConfigData.iapFreeUnlockEnabled;
     const html =
       '<div style="display:flex; align-items:center; justify-content:space-between;">' +
       '<div>' +
@@ -1934,6 +1936,13 @@ Don't assume this prompt is fully current — spot-check anything you're about t
       '<div class="meta">' + (lenientOn ? 'A test purchase still grants premium even if Apple/Google verification fails — for App Review only.' : 'Failed purchase verification now denies premium for real, no test fallback.') + '</div>' +
       '</div>' +
       '<button class="btn-sm ' + (lenientOn ? 'danger' : 'safe') + '" onclick="toggleIapLenientMode()">' + (lenientOn ? 'Turn OFF (launch)' : 'Turn ON (testing)') + '</button>' +
+      '</div>' +
+      '<div style="display:flex; align-items:center; justify-content:space-between; margin-top:14px; padding-top:14px; border-top:1px solid var(--border);">' +
+      '<div>' +
+      '<div class="name">Free self-serve upgrade is <span class="pill ' + (freeUnlockOn ? 'active' : 'stale') + '">' + (freeUnlockOn ? 'ON' : 'OFF') + '</span></div>' +
+      '<div class="meta">' + (freeUnlockOn ? 'Tapping any tier on the Upgrade screen skips real Play/Apple billing and grants it locally, free, instantly — no real subscription products exist yet, so this is the only way testers can reach premium themselves.' : 'Upgrade taps now attempt a real Play/Apple purchase, same as after public launch.') + '</div>' +
+      '</div>' +
+      '<button class="btn-sm ' + (freeUnlockOn ? 'danger' : 'safe') + '" onclick="toggleIapFreeUnlockMode()">' + (freeUnlockOn ? 'Turn OFF (launch)' : 'Turn ON (testing)') + '</button>' +
       '</div>';
     els.forEach((el) => { el.innerHTML = html; });
   }
@@ -1946,6 +1955,18 @@ Don't assume this prompt is fully current — spot-check anything you're about t
     try {
       await call('set_app_config', { iapLenientMode: next });
       appConfigData.iapLenientMode = next;
+      renderAppConfig();
+    } catch (e) { alert('Failed: ' + e.message); }
+  }
+
+  async function toggleIapFreeUnlockMode() {
+    if (!appConfigData) return;
+    const next = !appConfigData.iapFreeUnlockEnabled;
+    const verb = next ? 'turn free self-serve upgrade back ON (testers get a free instant unlock, no real purchase attempted)' : 'turn free self-serve upgrade OFF — only do this once real subscription products exist in both Play Console and App Store Connect, so upgrade taps go through genuine billing instead of an instant free grant';
+    if (!confirm('Are you sure you want to ' + verb + '?')) return;
+    try {
+      await call('set_app_config', { iapFreeUnlockEnabled: next });
+      appConfigData.iapFreeUnlockEnabled = next;
       renderAppConfig();
     } catch (e) { alert('Failed: ' + e.message); }
   }
