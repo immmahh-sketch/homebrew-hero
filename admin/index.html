@@ -1010,12 +1010,18 @@
       <div class="footnote" style="margin-bottom:16px;">
         Every AI call's full prompt and response, for reviewing real usage and spotting misuse — separate from
         the lightweight cost/token log the spend chart uses. Auto-purged after 90 days. Click a row to see the
-        full prompt/response text.
+        full prompt/response text. Username is resolved from the device's linked account (device_registry ->
+        profiles/auth) at read time — blank means the call was made signed out, or from a device never linked
+        to an account.
+      </div>
+      <div style="display:flex; align-items:center; gap:10px; margin-bottom:14px;">
+        <button class="btn-sm" onclick="downloadAiCallLogCsv()">Download CSV</button>
+        <span id="aiCallLogCsvStatus" class="footnote" style="margin:0;"></span>
       </div>
       <div id="aiCallLogListView">
         <table class="data-table">
-          <thead><tr><th>When</th><th>Feature</th><th>Tier</th><th>Model</th><th>Cost</th><th>Device</th></tr></thead>
-          <tbody id="aiCallLogBody"><tr><td colspan="6" class="empty-note">Loading…</td></tr></tbody>
+          <thead><tr><th>When</th><th>Feature</th><th>Tier</th><th>Model</th><th>Cost</th><th>Device</th><th>Username</th></tr></thead>
+          <tbody id="aiCallLogBody"><tr><td colspan="7" class="empty-note">Loading…</td></tr></tbody>
         </table>
       </div>
       <div id="aiCallLogDetailView" style="display:none;">
@@ -1642,7 +1648,7 @@ Don't assume this prompt is fully current — spot-check anything you're about t
   function renderAiCallLog() {
     const tbody = document.getElementById('aiCallLogBody');
     if (!aiCallLogData || !aiCallLogData.length) {
-      tbody.innerHTML = '<tr><td colspan="6" class="empty-note">No AI calls logged yet.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="7" class="empty-note">No AI calls logged yet.</td></tr>';
       return;
     }
     // Index-based onclick (a plain number needs no quoting at all) rather
@@ -1656,6 +1662,7 @@ Don't assume this prompt is fully current — spot-check anything you're about t
       '<td>' + (c.model || '—') + '</td>' +
       '<td>' + fmtUsd(c.estimated_cost_usd) + '</td>' +
       '<td style="font-size:11px; color:var(--muted);">' + c.device_id.slice(0, 12) + '…</td>' +
+      '<td>' + (c.username ? escapeHtml(c.username) : '—') + '</td>' +
       '</tr>'
     ).join('');
   }
@@ -1673,6 +1680,45 @@ Don't assume this prompt is fully current — spot-check anything you're about t
   function closeAiCallDetail() {
     document.getElementById('aiCallLogDetailView').style.display = 'none';
     document.getElementById('aiCallLogListView').style.display = 'block';
+  }
+
+  // Same fresh-fetch-then-Blob-download pattern as downloadTermsAcceptancesCsv
+  // below — pulls a brand new list_ai_call_log rather than reusing whatever's
+  // already rendered, so a download always reflects the latest 500 calls
+  // even if this tab has been open a while.
+  async function downloadAiCallLogCsv() {
+    const status = document.getElementById('aiCallLogCsvStatus');
+    status.textContent = 'Fetching latest data…';
+    try {
+      const { calls } = await call('list_ai_call_log');
+      const rows = [['When (UTC)', 'Feature', 'Tier', 'Model', 'Cost (USD)', 'Device ID', 'Username', 'Prompt', 'Response']];
+      for (const c of calls) {
+        rows.push([
+          c.created_at || '',
+          c.feature || '',
+          c.tier || '',
+          c.model || '',
+          c.estimated_cost_usd != null ? c.estimated_cost_usd : '',
+          c.device_id || '',
+          c.username || '',
+          c.prompt_text || '',
+          c.response_text || '',
+        ]);
+      }
+      const csv = rows.map((row) => row.map(csvEscape).join(',')).join('\r\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'ai-call-log-' + new Date().toISOString().slice(0, 10) + '.csv';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      status.textContent = calls.length + ' call(s) downloaded.';
+    } catch (e) {
+      status.textContent = 'Failed to download: ' + e.message;
+    }
   }
 
   // --- FEATURE USAGE ---
