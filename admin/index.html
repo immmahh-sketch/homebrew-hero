@@ -575,7 +575,6 @@
       </div>
       <div class="tab-group">
         <div class="tab-group-label">AI</div>
-        <button class="tab-btn" data-tab="calls" data-label="AI Call Log">AI Call Log</button>
         <button class="tab-btn" data-tab="kits" data-label="Recognized Kits">Recognized Kits</button>
       </div>
       <div class="tab-group">
@@ -804,28 +803,6 @@
     </section>
 
     <!-- AI CALL LOG -->
-    <section class="panel" id="panel-calls">
-      <div class="controls-row">
-        <button class="filter-btn active" data-feature="all">All features</button>
-        <button class="filter-btn" data-feature="tweak">Tweaks</button>
-        <button class="filter-btn" data-feature="generate">Generations</button>
-        <button class="filter-btn" data-feature="other">Other (kit scan, etc.)</button>
-        <input class="search-box" id="callDeviceFilter" placeholder="Filter by device ID…" oninput="renderCalls()" style="max-width:220px;" />
-      </div>
-      <div class="stat-row" id="callsStats"></div>
-      <table class="data-table">
-        <thead>
-          <tr><th>When</th><th>Device</th><th>Feature</th><th>Tier</th><th>Model</th><th>Tokens (in/out)</th><th>Est. Cost</th></tr>
-        </thead>
-        <tbody id="callsTableBody"><tr><td colspan="7" class="empty-note">Loading…</td></tr></tbody>
-      </table>
-      <div class="footnote">
-        Last 4 months, most recent 2000 calls. Each row is one AI request — "tweak" and "generate" are the two
-        allowance-metered features; everything else (kit-box scanning, conditionals, etc.) is logged for cost
-        visibility but isn't limited by the monthly tier allowance, only the flat daily anti-abuse cap.
-      </div>
-    </section>
-
     <!-- KITS -->
     <section class="panel" id="panel-kits">
       <div class="controls-row">
@@ -1090,6 +1067,9 @@
       <div id="aiCallLogDetailView" style="display:none;">
         <button class="btn-sm" onclick="closeAiCallDetail()" style="margin-bottom:14px;">← Back to call log</button>
         <h2 class="section-title" id="aiCallDetailTitle" style="margin-top:0;"></h2>
+        <div class="footnote" style="margin-bottom:16px;">
+          Username: <strong id="aiCallDetailUsername"></strong> &nbsp;·&nbsp; Device: <strong id="aiCallDetailDevice"></strong>
+        </div>
         <div class="footnote" style="margin-bottom:6px;">Prompt</div>
         <pre id="aiCallDetailPrompt" class="report-text"></pre>
         <div class="footnote" style="margin:16px 0 6px;">Response</div>
@@ -1197,11 +1177,10 @@
   const ANON_KEY = 'sb_publishable_tFB-sh1Zh7lk0StvG9aGdw_v6LCEyck';
 
   let SECRET = localStorage.getItem('hh_admin_secret') || '';
-  let usersData = null, devicesData = null, kitsData = null, spendData = null, callsData = null, suggestionsData = null, testersData = null, qrScansData = null, growthData = null, winbackData = null, appConfigData = null, killSwitchData = null, trafficData = null, cancellationFeedbackData = null, mailingListData = null;
+  let usersData = null, devicesData = null, kitsData = null, spendData = null, suggestionsData = null, testersData = null, qrScansData = null, growthData = null, winbackData = null, appConfigData = null, killSwitchData = null, trafficData = null, cancellationFeedbackData = null, mailingListData = null;
   let uptakeData = null, revenueData = null, profitData = null, deviceSpendData = null;
   let forumData = null, recipeBoardData = null, blockedNamesData = null;
   let deviceFilter = 'all';
-  let callFeatureFilter = 'all';
   let userTierFilter = 'all';
 
   async function call(action, extra) {
@@ -1510,7 +1489,7 @@
     btn.disabled = true;
     btn.textContent = '↻ Refreshing…';
     try {
-      const results = await Promise.allSettled([loadUsers(), loadDevices(), loadKits(), loadSpend(), loadCalls(), loadUptake(), loadRevenue(), loadProfit(), loadDeviceSpend(), loadSuggestions(), loadTesters(), loadQrScans(), loadSiteVisits(), loadGrowthStats(), loadWinbackOffers(), loadAppConfig(), loadKillSwitchAlerts(), loadForumContent(), loadRecipeBoard(), loadBlockedNames(), loadCancellationFeedback(), loadMailingList(), loadRetailerCatalog(), loadAiCallLog(), loadFeatureUsage(), loadAiReports(), loadTodoList()]);
+      const results = await Promise.allSettled([loadUsers(), loadDevices(), loadKits(), loadSpend(), loadUptake(), loadRevenue(), loadProfit(), loadDeviceSpend(), loadSuggestions(), loadTesters(), loadQrScans(), loadSiteVisits(), loadGrowthStats(), loadWinbackOffers(), loadAppConfig(), loadKillSwitchAlerts(), loadForumContent(), loadRecipeBoard(), loadBlockedNames(), loadCancellationFeedback(), loadMailingList(), loadRetailerCatalog(), loadAiCallLog(), loadFeatureUsage(), loadAiReports(), loadTodoList()]);
       const failed = results.filter((r) => r.status === 'rejected');
       if (failed.length > 0) {
         console.error('refreshAll: sections that failed to load', failed);
@@ -1826,6 +1805,8 @@ Don't assume this prompt is fully current — spot-check anything you're about t
     document.getElementById('aiCallLogDetailView').style.display = 'block';
     document.getElementById('aiCallDetailTitle').textContent =
       (c.feature || 'unmetered') + ' — ' + (c.tier || '—') + ' — ' + fmtDateTime(c.created_at);
+    document.getElementById('aiCallDetailUsername').textContent = c.username || '(signed out / unlinked device)';
+    document.getElementById('aiCallDetailDevice').textContent = c.device_id || '—';
     document.getElementById('aiCallDetailPrompt').textContent = c.prompt_text || '(no prompt text captured)';
     document.getElementById('aiCallDetailResponse').textContent = c.response_text || '(no plain-text response — likely a structured/tool-use reply)';
   }
@@ -2381,13 +2362,6 @@ Don't assume this prompt is fully current — spot-check anything you're about t
     }).join('');
   }
 
-  async function loadCalls() {
-    try {
-      callsData = (await call('device_calls')).calls;
-      renderCalls();
-    } catch (e) { console.error(e); }
-  }
-
   async function loadUsers() {
     try {
       usersData = await call('list_users');
@@ -2792,48 +2766,6 @@ Don't assume this prompt is fully current — spot-check anything you're about t
       hint.textContent = 'Failed: ' + e.message;
       hint.className = 'grant-box-hint error';
     }
-  }
-
-  document.querySelectorAll('[data-feature]').forEach((btn) => {
-    btn.onclick = () => {
-      document.querySelectorAll('[data-feature]').forEach((b) => b.classList.remove('active'));
-      btn.classList.add('active');
-      callFeatureFilter = btn.dataset.feature;
-      renderCalls();
-    };
-  });
-
-  function renderCalls() {
-    if (!callsData) return;
-    const deviceQ = document.getElementById('callDeviceFilter').value.trim().toLowerCase();
-    let rows = callsData.slice();
-    if (callFeatureFilter === 'other') rows = rows.filter((c) => !c.feature);
-    else if (callFeatureFilter !== 'all') rows = rows.filter((c) => c.feature === callFeatureFilter);
-    if (deviceQ) rows = rows.filter((c) => c.device_id.toLowerCase().includes(deviceQ));
-
-    const totalCost = rows.reduce((s, c) => s + (Number(c.estimated_cost_usd) || 0), 0);
-    const byFeatureCount = {};
-    rows.forEach((c) => { const k = c.feature || 'other'; byFeatureCount[k] = (byFeatureCount[k] || 0) + 1; });
-    document.getElementById('callsStats').innerHTML = [
-      statCard('Calls shown', rows.length),
-      statCard('Est. cost (shown)', fmtUsd(totalCost)),
-      statCard('Tweaks', byFeatureCount.tweak || 0),
-      statCard('Generations', byFeatureCount.generate || 0),
-    ].join('');
-
-    const body = document.getElementById('callsTableBody');
-    if (!rows.length) { body.innerHTML = '<tr><td colspan="7" class="empty-note">No calls match this filter.</td></tr>'; return; }
-    body.innerHTML = rows.slice(0, 500).map((c) => (
-      '<tr>' +
-      '<td>' + new Date(c.created_at).toLocaleString() + '</td>' +
-      '<td class="mono">' + c.device_id.slice(0, 14) + '…</td>' +
-      '<td>' + (c.feature || 'other') + '</td>' +
-      '<td><span class="pill ' + tierPillClass(c.tier) + '">' + tierLabel(c.tier) + '</span></td>' +
-      '<td class="mono">' + c.model + '</td>' +
-      '<td>' + c.input_tokens + ' / ' + c.output_tokens + '</td>' +
-      '<td>' + fmtUsd(Number(c.estimated_cost_usd) || 0) + '</td>' +
-      '</tr>'
-    )).join('') + (rows.length > 500 ? '<tr><td colspan="7" class="empty-note">Showing first 500 of ' + rows.length + ' matching calls.</td></tr>' : '');
   }
 
   function renderKits() {
