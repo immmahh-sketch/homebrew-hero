@@ -1430,11 +1430,16 @@
       : '<div class="empty-note">Nothing completed yet.</div>';
   }
 
+  // Checkbox is display-only (disabled, no onchange) — completion status is
+  // set by Claude via the set_todo_status action directly, never by a click
+  // here. Per the user's explicit request: no accidental toggling: "if I
+  // want to challenge the completion of an entry I'll do that with you
+  // directly" (i.e. in chat, not by re-clicking a box).
   function todoItemHtml(item) {
     const isDone = item.status === 'done';
     return (
       '<div class="todo-item' + (isDone ? ' done' : '') + '">' +
-      '<input type="checkbox" ' + (isDone ? 'checked' : '') + ' onchange="setTodoStatus(\'' + item.id + '\', this.checked)" />' +
+      '<input type="checkbox" disabled ' + (isDone ? 'checked' : '') + ' />' +
       '<div>' +
       '<div class="todo-text">' + escapeHtml(item.text) + '</div>' +
       '<div class="todo-meta">' + (isDone ? 'Completed ' + fmtDateTime(item.completed_at) : 'Added ' + fmtDateTime(item.created_at)) + '</div>' +
