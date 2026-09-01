@@ -699,8 +699,8 @@
         for free (admin grant, tester mode, or the App Review test-purchase leniency), not by paying.
       </div>
       <table class="data-table">
-        <thead><tr><th>Email</th><th>Device</th><th>30d spend</th><th>60d spend</th><th>Lifetime spend</th><th>Active days (30d)</th><th>Premium via</th></tr></thead>
-        <tbody id="deviceSpendBody"><tr><td colspan="7" class="load-note">Loading…</td></tr></tbody>
+        <thead><tr><th>Email</th><th>Device</th><th>Platform</th><th>30d spend</th><th>60d spend</th><th>Lifetime spend</th><th>Active days (30d)</th><th>Premium via</th></tr></thead>
+        <tbody id="deviceSpendBody"><tr><td colspan="8" class="load-note">Loading…</td></tr></tbody>
       </table>
 
       <h2 class="section-title" style="margin-top:22px;">Cancellation feedback</h2>
@@ -790,10 +790,10 @@
       <table class="data-table">
         <thead>
           <tr>
-            <th>Device ID</th><th>Tier</th><th>4mo Spend</th><th>4mo Calls</th><th>% Fair Use Used (this period)</th><th>Last Seen</th><th></th>
+            <th>Device ID</th><th>Platform</th><th>Tier</th><th>4mo Spend</th><th>4mo Calls</th><th>% Fair Use Used (this period)</th><th>Last Seen</th><th></th>
           </tr>
         </thead>
-        <tbody id="devicesTableBody"><tr><td colspan="7" class="empty-note">Loading…</td></tr></tbody>
+        <tbody id="devicesTableBody"><tr><td colspan="8" class="empty-note">Loading…</td></tr></tbody>
       </table>
       <div class="footnote">
         "Tier" is client-reported by the app, same trust level noted throughout the backend — a modified client
@@ -1532,6 +1532,17 @@
     return { standard: 'Standard', powerBrewer: 'Power User', ultimate: 'Ultimate' }[t] || t;
   }
   function tierPillClass(t) { return t || 'unknown'; }
+  // Client-reported (see ai-proxy's x-platform header) — first populated
+  // 2026-08-30 (to-do #37), so devices/accounts last active before that stay
+  // '—' until they make another AI call. Deliberately not a strong security
+  // boundary on its own — see claim-tester-grant's own x-platform check for
+  // the actual enforcement; this is just visibility for a human to spot-check.
+  function platformLabel(p) {
+    if (p === 'ios') return '🍎 iOS';
+    if (p === 'android') return '🤖 Android';
+    if (p === 'web') return '🌐 Web';
+    return '<span class="load-note" style="padding:0;">—</span>';
+  }
 
   // --- TO-DO LIST ---
   let todoItems = null;
@@ -2483,17 +2494,23 @@ Don't assume this prompt is fully current — spot-check anything you're about t
     const body = document.getElementById('deviceSpendBody');
     if (!body) return;
     const devices = deviceSpendData ? deviceSpendData.devices : null;
-    if (!devices) { body.innerHTML = '<tr><td colspan="7" class="load-note">Loading…</td></tr>'; return; }
-    if (devices.length === 0) { body.innerHTML = '<tr><td colspan="7" class="load-note">No devices with premium involvement yet.</td></tr>'; return; }
+    if (!devices) { body.innerHTML = '<tr><td colspan="8" class="load-note">Loading…</td></tr>'; return; }
+    if (devices.length === 0) { body.innerHTML = '<tr><td colspan="8" class="load-note">No devices with premium involvement yet.</td></tr>'; return; }
     body.innerHTML = devices.map((d) => {
       const via = [];
       if (d.spendLifetimeGbp > 0) via.push('purchase');
       if (d.hasAdminGrant) via.push('admin grant');
       if (d.hasActiveSubscription && d.spendLifetimeGbp <= 0) via.push('active sub (unpaid record)');
+      // iOS + a free grant with no real spend is exactly the "tester perk
+      // leaking to the wrong platform" case to-do #37 exists to catch — see
+      // claim-tester-grant's own x-platform check for the actual server-side
+      // block; this is the human-visible spot-check on top of that.
+      const flagLeak = d.platform === 'ios' && d.hasAdminGrant && d.spendLifetimeGbp <= 0;
       return (
-        '<tr>' +
+        '<tr' + (flagLeak ? ' style="background:rgba(224,67,58,0.12);"' : '') + '>' +
         '<td>' + (d.email ? escapeHtml(d.email) : '—') + '</td>' +
         '<td style="font-family:monospace; font-size:12px;">' + escapeHtml(d.deviceId.slice(0, 12)) + '…</td>' +
+        '<td>' + platformLabel(d.platform) + (flagLeak ? ' ⚠️' : '') + '</td>' +
         '<td>' + fmtGbp(d.spend30dGbp) + '</td>' +
         '<td>' + fmtGbp(d.spend60dGbp) + '</td>' +
         '<td>' + fmtGbp(d.spendLifetimeGbp) + '</td>' +
@@ -2842,10 +2859,11 @@ Don't assume this prompt is fully current — spot-check anything you're about t
     else if (sort === 'fairuse-desc') rows.sort((a, b) => (b.fairUseUsedPct ?? -1) - (a.fairUseUsedPct ?? -1));
 
     const body = document.getElementById('devicesTableBody');
-    if (!rows.length) { body.innerHTML = '<tr><td colspan="7" class="empty-note">No devices match this filter.</td></tr>'; return; }
+    if (!rows.length) { body.innerHTML = '<tr><td colspan="8" class="empty-note">No devices match this filter.</td></tr>'; return; }
     body.innerHTML = rows.map((d) => (
       '<tr>' +
       '<td class="mono">' + d.deviceId + '</td>' +
+      '<td>' + platformLabel(d.platform) + '</td>' +
       '<td>' + (d.banned ? '<span class="pill banned">BANNED</span>' : '<span class="pill ' + tierPillClass(d.lastReportedTier) + '">' + tierLabel(d.lastReportedTier) + '</span>') + '</td>' +
       '<td>' + fmtUsd(d.rolling4moCostUsd) + '</td>' +
       '<td>' + d.rolling4moCallCount + '</td>' +
