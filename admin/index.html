@@ -815,6 +815,24 @@
     <!-- FEATURE SUGGESTIONS -->
     <section class="panel" id="panel-suggestions">
       <div id="suggestionsList"><div class="load-note">Loading…</div></div>
+
+      <h3 style="margin-top:24px;">Requested Countries</h3>
+      <p class="load-note" style="margin-bottom:14px;">
+        From the country picker's "Other" option (Settings &gt; Location, and the Shopping List's
+        per-item retailer search) — a brewer whose country isn't in the curated retailer list can ask
+        for it. One request per brewer ever (see AppSettings.countryRequestSent), so a count here is
+        genuine distinct-brewer demand, not one person re-asking.
+      </p>
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Country (as typed)</th>
+            <th>Requests</th>
+            <th>Last requested</th>
+          </tr>
+        </thead>
+        <tbody id="countryRequestsBody"></tbody>
+      </table>
     </section>
 
     <!-- TESTER APPLICATIONS -->
@@ -1196,7 +1214,7 @@
   const ANON_KEY = 'sb_publishable_tFB-sh1Zh7lk0StvG9aGdw_v6LCEyck';
 
   let SECRET = localStorage.getItem('hh_admin_secret') || '';
-  let usersData = null, devicesData = null, kitsData = null, spendData = null, suggestionsData = null, testersData = null, qrScansData = null, growthData = null, winbackData = null, appConfigData = null, killSwitchData = null, trafficData = null, cancellationFeedbackData = null, mailingListData = null;
+  let usersData = null, devicesData = null, kitsData = null, spendData = null, suggestionsData = null, countryRequestsData = null, testersData = null, qrScansData = null, growthData = null, winbackData = null, appConfigData = null, killSwitchData = null, trafficData = null, cancellationFeedbackData = null, mailingListData = null;
   let uptakeData = null, revenueData = null, profitData = null, deviceSpendData = null;
   let forumData = null, recipeBoardData = null, blockedNamesData = null;
   let deviceFilter = 'all';
@@ -1640,7 +1658,7 @@
     btn.disabled = true;
     btn.textContent = '↻ Refreshing…';
     try {
-      const results = await Promise.allSettled([loadUsers(), loadDevices(), loadKits(), loadSpend(), loadUptake(), loadRevenue(), loadProfit(), loadDeviceSpend(), loadSuggestions(), loadTesters(), loadQrScans(), loadSiteVisits(), loadGrowthStats(), loadWinbackOffers(), loadAppConfig(), loadKillSwitchAlerts(), loadForumContent(), loadRecipeBoard(), loadBlockedNames(), loadCancellationFeedback(), loadMailingList(), loadRetailerCatalog(), loadAiCallLog(), loadFeatureUsage(), loadAiReports(), loadTodoList()]);
+      const results = await Promise.allSettled([loadUsers(), loadDevices(), loadKits(), loadSpend(), loadUptake(), loadRevenue(), loadProfit(), loadDeviceSpend(), loadSuggestions(), loadCountryRequests(), loadTesters(), loadQrScans(), loadSiteVisits(), loadGrowthStats(), loadWinbackOffers(), loadAppConfig(), loadKillSwitchAlerts(), loadForumContent(), loadRecipeBoard(), loadBlockedNames(), loadCancellationFeedback(), loadMailingList(), loadRetailerCatalog(), loadAiCallLog(), loadFeatureUsage(), loadAiReports(), loadTodoList()]);
       const failed = results.filter((r) => r.status === 'rejected');
       if (failed.length > 0) {
         console.error('refreshAll: sections that failed to load', failed);
@@ -2455,6 +2473,25 @@ Don't assume this prompt is fully current — spot-check anything you're about t
       '<div class="name">' + escapeHtml(s.suggestion) + '</div>' +
       '<div class="meta">' + (s.email || 'unknown user') + ' · ' + fmtDate(s.createdAt) + '</div>' +
       '</div>'
+    )).join('');
+  }
+
+  async function loadCountryRequests() {
+    try {
+      countryRequestsData = (await call('list_country_requests')).countryRequests;
+      renderCountryRequests();
+    } catch (e) { console.error(e); }
+  }
+
+  function renderCountryRequests() {
+    const body = document.getElementById('countryRequestsBody');
+    if (!body) return;
+    if (!countryRequestsData || !countryRequestsData.length) {
+      body.innerHTML = '<tr><td colspan="3" class="load-note">No country requests yet.</td></tr>';
+      return;
+    }
+    body.innerHTML = countryRequestsData.map((r) => (
+      '<tr><td>' + escapeHtml(r.display) + '</td><td>' + r.count + '</td><td>' + fmtDate(r.lastRequestedAt) + '</td></tr>'
     )).join('');
   }
 
