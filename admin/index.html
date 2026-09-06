@@ -527,6 +527,9 @@
     background: none; border: none; padding: 0; margin-top: 4px;
     color: var(--amber); font-size: 11.5px; font-weight: 700; cursor: pointer;
   }
+  .tester-tracking-date {
+    font-size: 11px; color: var(--muted); margin-top: 2px; white-space: nowrap;
+  }
 </style>
 </head>
 <body>
@@ -854,10 +857,13 @@
             <th>Last Open</th>
             <th>Engagements</th>
             <th>AI Spend</th>
+            <th>Added to Google Tester List</th>
+            <th>Download Link Sent</th>
+            <th>Account Created</th>
             <th></th>
           </tr>
         </thead>
-        <tbody id="testersBody"><tr><td colspan="10" class="empty-note">Loading…</td></tr></tbody>
+        <tbody id="testersBody"><tr><td colspan="13" class="empty-note">Loading…</td></tr></tbody>
       </table>
     </section>
 
@@ -2446,7 +2452,7 @@ Don't assume this prompt is fully current — spot-check anything you're about t
 
   function renderTesters() {
     const body = document.getElementById('testersBody');
-    if (!testersData || !testersData.length) { body.innerHTML = '<tr><td colspan="10" class="empty-note">No applications yet.</td></tr>'; return; }
+    if (!testersData || !testersData.length) { body.innerHTML = '<tr><td colspan="13" class="empty-note">No applications yet.</td></tr>'; return; }
     body.innerHTML = testersData.map((a) => (
       '<tr>' +
       '<td>' + fmtDate(a.createdAt) + '</td>' +
@@ -2458,11 +2464,32 @@ Don't assume this prompt is fully current — spot-check anything you're about t
       '<td>' + (a.lastAppOpenAt ? fmtDate(a.lastAppOpenAt) : '—') + '</td>' +
       '<td>' + (a.engagementCount ?? '—') + '</td>' +
       '<td>' + (a.aiSpendUsd != null ? fmtUsd(a.aiSpendUsd) : '—') + '</td>' +
+      '<td>' +
+        '<input type="checkbox" ' + (a.addedToTesterList ? 'checked' : '') +
+        ' onchange=\'toggleTesterApplicationTracking(' + JSON.stringify(a.id) + ', "addedToTesterList", this.checked)\'>' +
+      '</td>' +
+      '<td>' +
+        '<input type="checkbox" ' + (a.downloadLinkSentAt ? 'checked' : '') +
+        ' onchange=\'toggleTesterApplicationTracking(' + JSON.stringify(a.id) + ', "downloadLinkSent", this.checked)\'>' +
+        (a.downloadLinkSentAt ? '<div class="tester-tracking-date">' + fmtDate(a.downloadLinkSentAt) + '</div>' : '') +
+      '</td>' +
+      '<td>' + (a.accountCreatedAt ? fmtDate(a.accountCreatedAt) : '—') + '</td>' +
       '<td>' + (a.email
         ? '<button class="btn-sm danger" onclick=\'cancelPremium(' + JSON.stringify(a.email) + ')\'>Cancel premium</button>'
         : '') + '</td>' +
       '</tr>'
     )).join('');
+  }
+
+  // addedToTesterList/downloadLinkSent are the only two writable fields on
+  // this row (see migration 0058) — accountCreatedAt is resolved live from
+  // a real auth.users match, same as lastAppOpenAt, so there's nothing to
+  // toggle for it.
+  async function toggleTesterApplicationTracking(id, field, checked) {
+    try {
+      await call('set_tester_application_tracking', { id, [field]: checked });
+      await loadTesters();
+    } catch (e) { alert('Failed: ' + e.message); }
   }
 
   // Line-clamped to 3 lines by default (see .notes-text CSS) — only long
