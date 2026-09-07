@@ -836,6 +836,23 @@
         </thead>
         <tbody id="countryRequestsBody"></tbody>
       </table>
+
+      <h3 style="margin-top:24px;">Requested Clones</h3>
+      <p class="load-note" style="margin-bottom:14px;">
+        From the dedicated "Suggest a Clone" box on the Suggest a Feature page (Support screen) —
+        a beer/wine/cider a brewer wants added to Popular Clones. No per-brewer limit, so a repeat
+        count here can also mean one enthusiastic brewer asking more than once, not only distinct demand.
+      </p>
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Clone (as typed)</th>
+            <th>Requests</th>
+            <th>Last requested</th>
+          </tr>
+        </thead>
+        <tbody id="cloneRequestsBody"></tbody>
+      </table>
     </section>
 
     <!-- TESTER APPLICATIONS -->
@@ -1220,7 +1237,7 @@
   const ANON_KEY = 'sb_publishable_tFB-sh1Zh7lk0StvG9aGdw_v6LCEyck';
 
   let SECRET = localStorage.getItem('hh_admin_secret') || '';
-  let usersData = null, devicesData = null, kitsData = null, spendData = null, suggestionsData = null, countryRequestsData = null, testersData = null, qrScansData = null, growthData = null, winbackData = null, appConfigData = null, killSwitchData = null, trafficData = null, cancellationFeedbackData = null, mailingListData = null;
+  let usersData = null, devicesData = null, kitsData = null, spendData = null, suggestionsData = null, countryRequestsData = null, cloneRequestsData = null, testersData = null, qrScansData = null, growthData = null, winbackData = null, appConfigData = null, killSwitchData = null, trafficData = null, cancellationFeedbackData = null, mailingListData = null;
   let uptakeData = null, revenueData = null, profitData = null, deviceSpendData = null;
   let forumData = null, recipeBoardData = null, blockedNamesData = null;
   let deviceFilter = 'all';
@@ -1664,7 +1681,7 @@
     btn.disabled = true;
     btn.textContent = '↻ Refreshing…';
     try {
-      const results = await Promise.allSettled([loadUsers(), loadDevices(), loadKits(), loadSpend(), loadUptake(), loadRevenue(), loadProfit(), loadDeviceSpend(), loadSuggestions(), loadCountryRequests(), loadTesters(), loadQrScans(), loadSiteVisits(), loadGrowthStats(), loadWinbackOffers(), loadAppConfig(), loadKillSwitchAlerts(), loadForumContent(), loadRecipeBoard(), loadBlockedNames(), loadCancellationFeedback(), loadMailingList(), loadRetailerCatalog(), loadAiCallLog(), loadFeatureUsage(), loadAiReports(), loadTodoList()]);
+      const results = await Promise.allSettled([loadUsers(), loadDevices(), loadKits(), loadSpend(), loadUptake(), loadRevenue(), loadProfit(), loadDeviceSpend(), loadSuggestions(), loadCountryRequests(), loadCloneRequests(), loadTesters(), loadQrScans(), loadSiteVisits(), loadGrowthStats(), loadWinbackOffers(), loadAppConfig(), loadKillSwitchAlerts(), loadForumContent(), loadRecipeBoard(), loadBlockedNames(), loadCancellationFeedback(), loadMailingList(), loadRetailerCatalog(), loadAiCallLog(), loadFeatureUsage(), loadAiReports(), loadTodoList()]);
       const failed = results.filter((r) => r.status === 'rejected');
       if (failed.length > 0) {
         console.error('refreshAll: sections that failed to load', failed);
@@ -2544,6 +2561,25 @@ Don't assume this prompt is fully current — spot-check anything you're about t
       return;
     }
     body.innerHTML = countryRequestsData.map((r) => (
+      '<tr><td>' + escapeHtml(r.display) + '</td><td>' + r.count + '</td><td>' + fmtDate(r.lastRequestedAt) + '</td></tr>'
+    )).join('');
+  }
+
+  async function loadCloneRequests() {
+    try {
+      cloneRequestsData = (await call('list_clone_requests')).cloneRequests;
+      renderCloneRequests();
+    } catch (e) { console.error(e); }
+  }
+
+  function renderCloneRequests() {
+    const body = document.getElementById('cloneRequestsBody');
+    if (!body) return;
+    if (!cloneRequestsData || !cloneRequestsData.length) {
+      body.innerHTML = '<tr><td colspan="3" class="load-note">No clone requests yet.</td></tr>';
+      return;
+    }
+    body.innerHTML = cloneRequestsData.map((r) => (
       '<tr><td>' + escapeHtml(r.display) + '</td><td>' + r.count + '</td><td>' + fmtDate(r.lastRequestedAt) + '</td></tr>'
     )).join('');
   }
