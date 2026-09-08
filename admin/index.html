@@ -409,6 +409,7 @@
   .btn-sm.safe { border-color: var(--green); color: var(--green); }
 
   .empty-note { color: var(--muted); text-align: center; padding: 30px; font-size: 13px; }
+  .muted-small { color: var(--muted); font-size: 11px; }
   .load-note { color: var(--muted); text-align: center; padding: 20px; font-size: 13px; }
 
   .kit-card {
@@ -756,10 +757,10 @@
       <table class="data-table">
         <thead>
           <tr>
-            <th>Username</th><th>Email</th><th>Language</th><th>Location</th><th>Tier</th><th>Premium Since</th><th>Renews</th><th>Signed Up</th><th>Last Sign-In</th><th>Last Used App</th><th>Tester Mode</th><th></th>
+            <th>Username</th><th>Email</th><th>Language</th><th>Location</th><th>Tier</th><th>Premium Since</th><th>Renews</th><th>Signed Up</th><th>Last Sign-In</th><th>Last Used App</th><th>OTA Version</th><th>Tester Mode</th><th></th>
           </tr>
         </thead>
-        <tbody id="usersTableBody"><tr><td colspan="12" class="empty-note">Loading…</td></tr></tbody>
+        <tbody id="usersTableBody"><tr><td colspan="13" class="empty-note">Loading…</td></tr></tbody>
       </table>
     </section>
 
@@ -2899,7 +2900,7 @@ Don't assume this prompt is fully current — spot-check anything you're about t
       .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
     const body = document.getElementById('usersTableBody');
-    if (!rows.length) { body.innerHTML = '<tr><td colspan="12" class="empty-note">No matching accounts.</td></tr>'; return; }
+    if (!rows.length) { body.innerHTML = '<tr><td colspan="13" class="empty-note">No matching accounts.</td></tr>'; return; }
     body.innerHTML = rows.map((u) => (
       '<tr>' +
       '<td>' + (u.displayName || '—') + (u.forumBanned ? ' <span class="pill banned">FORUM BANNED</span>' : '') + '</td>' +
@@ -2912,6 +2913,11 @@ Don't assume this prompt is fully current — spot-check anything you're about t
       '<td>' + fmtDate(u.createdAt) + '</td>' +
       '<td>' + fmtDate(u.lastSignInAt) + '</td>' +
       '<td>' + fmtDate(u.lastAppOpenAt) + '</td>' +
+      '<td>' +
+        (u.lastKnownBuildVersion
+          ? u.lastKnownBuildVersion + (u.lastKnownOtaAppliedAt ? '<br><span class="muted-small">' + fmtDate(u.lastKnownOtaAppliedAt) + '</span>' : '')
+          : '—') +
+      '</td>' +
       '<td>' +
         (u.email
           ? '<button class="btn-sm ' + (u.testerMode ? 'danger' : 'safe') + '" onclick=\'toggleTesterMode(' + JSON.stringify(u.email) + ', ' + !u.testerMode + ')\'>' +
