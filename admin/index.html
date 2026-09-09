@@ -359,6 +359,10 @@
   .grant-box-hint { color: var(--muted); font-size: 11.5px; margin-top: 8px; line-height: 1.5; }
   .grant-box-hint.success { color: var(--green); }
   .grant-box-hint.error { color: var(--red); }
+  .role-candidate-row {
+    padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 12.5px; color: var(--ink);
+  }
+  .role-candidate-row:hover { background: rgba(227,165,66,0.12); }
 
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
   table.data-table { background: var(--bg-panel); border: 1px solid var(--border); border-radius: 10px; }
@@ -1009,6 +1013,51 @@
         Deleting here is permanent. Warning queues a one-time popup the account sees on next login; Ban blocks that
         account from posting anywhere (any device) while still letting them read — Unban reverses it.
       </div>
+
+      <h2 class="section-title">Hero Helpers &amp; Owners</h2>
+      <p class="footnote" style="margin-bottom:12px;">
+        A Hero Helper gets a gold name + superhero icon in the Forum, real lifetime-free Ultimate (enforced
+        server-side, not just a display flag), a distinct Home Screen, and can ban/remove posts in-app (with a
+        required reason, logged below). Owner gets the same plus full admin control, including this dashboard built
+        into the app. Every grant needs a confirmation code sent to your own email before it takes effect — revoking
+        doesn't need one.
+      </p>
+      <div class="grant-box">
+        <div class="grant-box-title">Promote someone</div>
+        <div class="grant-box-row">
+          <input type="text" id="roleGrantSearchInput" placeholder="Search by name or email…" oninput="renderRoleGrantCandidates()" style="min-width:260px;" />
+          <select id="roleGrantRoleSelect">
+            <option value="heroHelper">Hero Helper</option>
+            <option value="owner">Owner</option>
+          </select>
+          <button class="btn-sm safe" id="roleGrantSendBtn" onclick="requestRoleGrant()" disabled>Send confirmation code</button>
+        </div>
+        <div id="roleGrantCandidates" class="grant-box-hint"></div>
+        <div id="roleGrantOtpBox" style="display:none; margin-top:10px;">
+          <div class="grant-box-hint">Code sent to your own email — enter it below (expires in 15 minutes):</div>
+          <div class="grant-box-row">
+            <input type="text" id="roleGrantOtpInput" placeholder="6-digit code" maxlength="6" style="max-width:140px;" />
+            <button class="btn-sm safe" onclick="confirmRoleGrant()">Confirm</button>
+            <button class="btn-sm" onclick="document.getElementById('roleGrantOtpBox').style.display='none'">Cancel</button>
+          </div>
+        </div>
+        <div class="grant-box-hint" id="roleGrantHint"></div>
+      </div>
+      <table class="data-table">
+        <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Granted</th><th></th></tr></thead>
+        <tbody id="specialRolesBody"><tr><td colspan="5" class="empty-note">Loading…</td></tr></tbody>
+      </table>
+
+      <h2 class="section-title">Banned Users &amp; removed posts</h2>
+      <p class="footnote" style="margin-bottom:12px;">
+        Every ban/unban/removal, whether done here directly or by a Hero Helper/Owner in-app. "(Paul, via admin
+        portal)" means it was done here, not by an in-app moderator.
+      </p>
+      <table class="data-table">
+        <thead><tr><th>When</th><th>Action</th><th>Target</th><th>By</th><th>Reason / content</th></tr></thead>
+        <tbody id="moderationLogBody"><tr><td colspan="5" class="empty-note">Loading…</td></tr></tbody>
+      </table>
+
       <h2 class="section-title">Discussion threads</h2>
       <table class="data-table">
         <thead><tr><th>Author</th><th>Title</th><th>Posted</th><th></th></tr></thead>
@@ -1682,7 +1731,7 @@
     btn.disabled = true;
     btn.textContent = '↻ Refreshing…';
     try {
-      const results = await Promise.allSettled([loadUsers(), loadDevices(), loadKits(), loadSpend(), loadUptake(), loadRevenue(), loadProfit(), loadDeviceSpend(), loadSuggestions(), loadCountryRequests(), loadCloneRequests(), loadTesters(), loadQrScans(), loadSiteVisits(), loadGrowthStats(), loadWinbackOffers(), loadAppConfig(), loadKillSwitchAlerts(), loadForumContent(), loadRecipeBoard(), loadBlockedNames(), loadCancellationFeedback(), loadMailingList(), loadRetailerCatalog(), loadAiCallLog(), loadFeatureUsage(), loadAiReports(), loadTodoList()]);
+      const results = await Promise.allSettled([loadUsers(), loadDevices(), loadKits(), loadSpend(), loadUptake(), loadRevenue(), loadProfit(), loadDeviceSpend(), loadSuggestions(), loadCountryRequests(), loadCloneRequests(), loadTesters(), loadQrScans(), loadSiteVisits(), loadGrowthStats(), loadWinbackOffers(), loadAppConfig(), loadKillSwitchAlerts(), loadForumContent(), loadSpecialRoles(), loadModerationLog(), loadRecipeBoard(), loadBlockedNames(), loadCancellationFeedback(), loadMailingList(), loadRetailerCatalog(), loadAiCallLog(), loadFeatureUsage(), loadAiReports(), loadTodoList()]);
       const failed = results.filter((r) => r.status === 'rejected');
       if (failed.length > 0) {
         console.error('refreshAll: sections that failed to load', failed);
@@ -3214,6 +3263,124 @@ Don't assume this prompt is fully current — spot-check anything you're about t
           '<tr><td>' + authorLabel(c) + '</td><td>' + (c.body || '').slice(0, 160) + '</td><td>' + fmtDate(c.created_at) + '</td>' +
           '<td>' + moderationActions(c, 'chat') + '</td></tr>'
         )).join('');
+  }
+
+  // ---------------- Hero Helper / Owner roles ----------------
+
+  let roleGrantSelectedUserId = null;
+  let roleGrantPendingRequestId = null;
+
+  function roleLabel(role) {
+    return role === 'owner' ? 'Owner' : role === 'heroHelper' ? 'Hero Helper' : 'Member';
+  }
+
+  // Reuses whatever the Registered Accounts tab already loaded (usersData)
+  // rather than a second lookup -- same list, just filtered/rendered as
+  // pickable candidates instead of the full accounts table.
+  function renderRoleGrantCandidates() {
+    roleGrantSelectedUserId = null;
+    document.getElementById('roleGrantSendBtn').disabled = true;
+    const q = document.getElementById('roleGrantSearchInput').value.trim().toLowerCase();
+    const box = document.getElementById('roleGrantCandidates');
+    if (!q || !usersData) { box.innerHTML = ''; return; }
+    const matches = usersData.users
+      .filter((u) => (u.displayName || '').toLowerCase().includes(q) || (u.email || '').toLowerCase().includes(q))
+      .slice(0, 8);
+    if (!matches.length) { box.innerHTML = 'No matching accounts.'; return; }
+    box.innerHTML = matches.map((u) =>
+      '<div class="role-candidate-row" onclick=\'selectRoleGrantCandidate(' + JSON.stringify(u.userId) + ', ' + JSON.stringify((u.displayName || u.email || u.userId)) + ')\'>' +
+      (u.displayName || '—') + ' — ' + (u.email || u.userId) +
+      (u.role !== 'member' ? ' <span class="pill active">' + roleLabel(u.role) + '</span>' : '') +
+      '</div>'
+    ).join('');
+  }
+
+  function selectRoleGrantCandidate(userId, label) {
+    roleGrantSelectedUserId = userId;
+    document.getElementById('roleGrantSearchInput').value = label;
+    document.getElementById('roleGrantCandidates').innerHTML = '';
+    document.getElementById('roleGrantSendBtn').disabled = false;
+  }
+
+  async function requestRoleGrant() {
+    if (!roleGrantSelectedUserId) return;
+    const newRole = document.getElementById('roleGrantRoleSelect').value;
+    const hint = document.getElementById('roleGrantHint');
+    hint.className = 'grant-box-hint';
+    hint.textContent = 'Sending…';
+    try {
+      const res = await call('request_role_grant', { userId: roleGrantSelectedUserId, newRole });
+      roleGrantPendingRequestId = res.requestId;
+      document.getElementById('roleGrantOtpBox').style.display = '';
+      document.getElementById('roleGrantOtpInput').value = '';
+      document.getElementById('roleGrantOtpInput').focus();
+      hint.textContent = 'Check your email for the code.';
+    } catch (e) {
+      hint.className = 'grant-box-hint error';
+      hint.textContent = 'Failed: ' + e.message;
+    }
+  }
+
+  async function confirmRoleGrant() {
+    const otpCode = document.getElementById('roleGrantOtpInput').value.trim();
+    const hint = document.getElementById('roleGrantHint');
+    if (!roleGrantPendingRequestId || !otpCode) return;
+    try {
+      await call('confirm_role_grant', { requestId: roleGrantPendingRequestId, otpCode });
+      hint.className = 'grant-box-hint success';
+      hint.textContent = 'Role granted.';
+      document.getElementById('roleGrantOtpBox').style.display = 'none';
+      document.getElementById('roleGrantSearchInput').value = '';
+      roleGrantSelectedUserId = null;
+      roleGrantPendingRequestId = null;
+      document.getElementById('roleGrantSendBtn').disabled = true;
+      await Promise.all([loadSpecialRoles(), loadUsers()]);
+    } catch (e) {
+      hint.className = 'grant-box-hint error';
+      hint.textContent = 'Failed: ' + e.message;
+    }
+  }
+
+  async function revokeSpecialRole(userId, label) {
+    if (!confirm('Revoke ' + label + '\'s Hero Helper/Owner status? They keep whatever premium tier they had before (this does not touch that), but lose the role/forum styling/moderation rights and any in-app admin access immediately.')) return;
+    try {
+      await call('revoke_special_role', { userId });
+      await Promise.all([loadSpecialRoles(), loadUsers()]);
+    } catch (e) { alert('Failed: ' + e.message); }
+  }
+
+  let specialRolesData = null;
+  async function loadSpecialRoles() {
+    try { specialRolesData = await call('list_special_roles'); renderSpecialRoles(); }
+    catch (e) { console.error(e); }
+  }
+  function renderSpecialRoles() {
+    if (!specialRolesData) return;
+    const body = document.getElementById('specialRolesBody');
+    if (!specialRolesData.entries.length) { body.innerHTML = '<tr><td colspan="5" class="empty-note">No Hero Helpers or Owners yet.</td></tr>'; return; }
+    body.innerHTML = specialRolesData.entries.map((r) => (
+      '<tr><td>' + (r.display_name || '—') + '</td><td>' + (r.email || '—') + '</td>' +
+      '<td><span class="pill active">' + roleLabel(r.role) + '</span></td><td>' + fmtDate(r.role_granted_at) + '</td>' +
+      '<td><button class="btn-sm danger" onclick=\'revokeSpecialRole(' + JSON.stringify(r.user_id) + ', ' + JSON.stringify(r.display_name || r.email || 'this account') + ')\'>Revoke</button></td></tr>'
+    )).join('');
+  }
+
+  let moderationLogData = null;
+  async function loadModerationLog() {
+    try { moderationLogData = await call('list_moderation_log'); renderModerationLog(); }
+    catch (e) { console.error(e); }
+  }
+  function renderModerationLog() {
+    if (!moderationLogData) return;
+    const body = document.getElementById('moderationLogBody');
+    if (!moderationLogData.entries.length) { body.innerHTML = '<tr><td colspan="5" class="empty-note">No moderation actions yet.</td></tr>'; return; }
+    body.innerHTML = moderationLogData.entries.map((e) => (
+      '<tr><td>' + fmtDate(e.created_at) + '</td>' +
+      '<td>' + (e.action === 'ban' ? 'Banned' : e.action === 'unban' ? 'Unbanned' : 'Post removed') + '</td>' +
+      '<td>' + (e.targetName || e.targetEmail || (e.target_user_id ? e.target_user_id.slice(0, 8) + '…' : '—')) + '</td>' +
+      '<td>' + (e.moderatorName || e.moderatorEmail || '—') + '</td>' +
+      '<td>' + (e.reason ? e.reason : (e.content_snapshot ? '<em>' + e.content_snapshot.slice(0, 140) + '</em>' : '—')) + '</td></tr>'
+    )).join('');
   }
 
   async function deleteForumThread(id) {
