@@ -862,6 +862,24 @@
         </thead>
         <tbody id="cloneRequestsBody"></tbody>
       </table>
+
+      <h3 style="margin-top:24px;">Missing Brand Logos</h3>
+      <p class="load-note" style="margin-bottom:14px;">
+        Brands the web-search logo lookup has tried and failed to find a logo for (migration 0068).
+        Each attempt is a wasted ~$0.15&ndash;0.20 Sonnet + web_search call until a real logo is curated
+        by hand into <code>KNOWN_BRAND_LOGOS</code> / <code>CLONE_LOGOS</code>. Shown once a brand has been
+        wanted 5+ times &mdash; add those, or confirm no logo exists.
+      </p>
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Brand (as looked up)</th>
+            <th>Attempts</th>
+            <th>Last attempt</th>
+          </tr>
+        </thead>
+        <tbody id="brandLogoGapsBody"></tbody>
+      </table>
     </section>
 
     <!-- TESTER APPLICATIONS -->
@@ -1748,7 +1766,7 @@
     btn.disabled = true;
     btn.textContent = '↻ Refreshing…';
     try {
-      const results = await Promise.allSettled([loadUsers(), loadDevices(), loadKits(), loadSpend(), loadUptake(), loadRevenue(), loadProfit(), loadDeviceSpend(), loadSuggestions(), loadCountryRequests(), loadCloneRequests(), loadTesters(), loadQrScans(), loadSiteVisits(), loadGrowthStats(), loadWinbackOffers(), loadAppConfig(), loadKillSwitchAlerts(), loadForumContent(), loadSpecialRoles(), loadModerationLog(), loadRecipeBoard(), loadBlockedNames(), loadCancellationFeedback(), loadMailingList(), loadRetailerCatalog(), loadAiCallLog(), loadFeatureUsage(), loadAiReports(), loadTodoList(), loadClientErrors()]);
+      const results = await Promise.allSettled([loadUsers(), loadDevices(), loadKits(), loadSpend(), loadUptake(), loadRevenue(), loadProfit(), loadDeviceSpend(), loadSuggestions(), loadCountryRequests(), loadCloneRequests(), loadBrandLogoGaps(), loadTesters(), loadQrScans(), loadSiteVisits(), loadGrowthStats(), loadWinbackOffers(), loadAppConfig(), loadKillSwitchAlerts(), loadForumContent(), loadSpecialRoles(), loadModerationLog(), loadRecipeBoard(), loadBlockedNames(), loadCancellationFeedback(), loadMailingList(), loadRetailerCatalog(), loadAiCallLog(), loadFeatureUsage(), loadAiReports(), loadTodoList(), loadClientErrors()]);
       const failed = results.filter((r) => r.status === 'rejected');
       if (failed.length > 0) {
         console.error('refreshAll: sections that failed to load', failed);
@@ -2687,6 +2705,26 @@ Don't assume this prompt is fully current — spot-check anything you're about t
     }
     body.innerHTML = cloneRequestsData.map((r) => (
       '<tr><td>' + escapeHtml(r.display) + '</td><td>' + r.count + '</td><td>' + fmtDate(r.lastRequestedAt) + '</td></tr>'
+    )).join('');
+  }
+
+  let brandLogoGapsData = null;
+  async function loadBrandLogoGaps() {
+    try {
+      brandLogoGapsData = (await call('list_brand_logo_gaps')).gaps;
+      renderBrandLogoGaps();
+    } catch (e) { console.error(e); }
+  }
+
+  function renderBrandLogoGaps() {
+    const body = document.getElementById('brandLogoGapsBody');
+    if (!body) return;
+    if (!brandLogoGapsData || !brandLogoGapsData.length) {
+      body.innerHTML = '<tr><td colspan="3" class="load-note">No brand-logo gaps yet.</td></tr>';
+      return;
+    }
+    body.innerHTML = brandLogoGapsData.map((r) => (
+      '<tr><td>' + escapeHtml(r.brand || r.brand_key) + '</td><td>' + r.attempt_count + '</td><td>' + fmtDate(r.last_attempt_at || r.created_at) + '</td></tr>'
     )).join('');
   }
 
