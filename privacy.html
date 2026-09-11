@@ -32,7 +32,7 @@
 <main class="legal-doc">
   <a href="index.html" class="back">← Back to Homebrew Hero</a>
   <h1>Privacy Policy — Homebrew Hero</h1>
-  <p class="effective">Effective Date: 10 September 2026</p>
+  <p class="effective">Effective Date: 11 September 2026</p>
   <p>Homebrew Hero ("the App", "we", "us") is developed by a solo, UK-based developer. This Privacy Policy explains what personal data the App collects, why, and what your rights are.</p>
 
   <p>If you have questions about this policy or your data, contact: <a href="mailto:info@homebrewhero.app" style="color:var(--amber-light);">info@homebrewhero.app</a></p>
@@ -57,11 +57,11 @@
 <h3>2.4 Brewing data</h3>
 <p>Everything you enter about your brews &mdash; recipe names, styles, ingredients, batch sizes, fermentation temperatures, gravity/pH readings, tasting notes, schedules, and any photos you choose to submit for AI kit-box scanning or recipe scanning &mdash; is stored so the App can function and so it can sync across your devices when you're signed in. Brewing data is private to your account unless you deliberately share or post it (see Section 7).</p>
 <h3>2.5 Data sent to our AI provider (Anthropic)</h3>
-<p>Certain features &mdash; AI recipe generation, AI recipe tweaking, kit-box/instruction photo scanning, brand logo lookup &mdash; send data to Anthropic (the maker of Claude) via our own backend, which we operate so that our Anthropic API key is never embedded in the App itself. Depending on the feature, this may include:</p>
+<p>Certain features &mdash; AI recipe generation, AI recipe tweaking, kit-box/instruction photo scanning, brand logo lookup, starting flavour-profile predictions, and the water profile lookup described in Section 2.12 &mdash; send data to Anthropic (the maker of Claude) via our own backend, which we operate so that our Anthropic API key is never embedded in the App itself. Depending on the feature, this may include:</p>
 <ul>
-<li>Text you enter (e.g. a beer style, a commercial brand name to clone, brewing questions)</li>
+<li>Text you enter (e.g. a beer style, a commercial brand name to clone, brewing questions, a postal/zip code for the water profile lookup)</li>
 <li>Photos you submit for scanning (e.g. a kit box or its instructions)</li>
-<li>Non-personal brewing context (batch size, equipment you own, unit preferences) needed to generate a relevant answer</li>
+<li>Non-personal brewing context (batch size, equipment you own, unit preferences, recipe ingredients) needed to generate a relevant answer</li>
 </ul>
 <p>We do not send your email address, real name, or account credentials to Anthropic. Requests are tagged with your device identifier only (not your email) so our backend can apply rate limits.</p>
 <h3>2.6 Usage and cost logs (server-side)</h3>
@@ -76,6 +76,8 @@
 <p>If you contact us through the App's Contact Support form, or submit a feature suggestion, we receive your email address, your account identifier, and the message you send, so we can read and reply to it. We use this only to respond to you and to help prioritise what to build next.</p>
 <h3>2.11 Access to your data when you report a problem</h3>
 <p>As the sole operator of the service, the developer can &mdash; through a secure, password-protected, access-controlled tool &mdash; load a read-only copy of a signed-in account's synced brewing data and app settings, in order to reproduce and fix a specific problem that account has reported. This is used only in response to a support request or bug report; it is read-only (nothing in your account is changed by it); and it is not part of normal day-to-day operation. Public content (see Section 7) is visible to the developer in the same way it is to any other user, independently of this tool.</p>
+<h3>2.12 Water profile lookup (postcode/zip code)</h3>
+<p>If you use the optional, paid water profile lookup feature, the postal or zip code you enter is sent to our backend and to Anthropic (see Section 2.5) to search for a published water-quality report covering your area. We do not ask for or store your street address &mdash; a postcode/zip code alone. The resulting estimated water profile (mineral levels, confidence level, and source) is stored against your account so it can be reused in future brews; the postcode itself is retained only as long as needed to support that lookup and is not shared with any third party other than Anthropic for the purpose of the search itself. This feature is entirely optional and off by default.</p>
 <h2>3. Why we collect this data</h2>
 <p>We collect and use your personal data for the following purposes:</p>
 <ul>
