@@ -2502,6 +2502,7 @@ Don't assume this prompt is fully current — spot-check anything you're about t
     if (!appConfigData) { els.forEach((el) => { el.innerHTML = '<div class="load-note">Loading…</div>'; }); return; }
     const lenientOn = appConfigData.iapLenientMode;
     const freeUnlockOn = appConfigData.iapFreeUnlockEnabled;
+    const iosTokenOn = appConfigData.iosTokenPurchaseEnabled;
     const html =
       '<div style="display:flex; align-items:center; justify-content:space-between;">' +
       '<div>' +
@@ -2516,6 +2517,13 @@ Don't assume this prompt is fully current — spot-check anything you're about t
       '<div class="meta">' + (freeUnlockOn ? 'Tapping any tier on the Upgrade screen skips real Play/Apple billing and grants it locally, free, instantly — no real subscription products exist yet, so this is the only way testers can reach premium themselves.' : 'Upgrade taps now attempt a real Play/Apple purchase, same as after public launch.') + '</div>' +
       '</div>' +
       '<button class="btn-sm ' + (freeUnlockOn ? 'danger' : 'safe') + '" onclick="toggleIapFreeUnlockMode()">' + (freeUnlockOn ? 'Turn OFF (launch)' : 'Turn ON (testing)') + '</button>' +
+      '</div>' +
+      '<div style="display:flex; align-items:center; justify-content:space-between; margin-top:14px; padding-top:14px; border-top:1px solid var(--border);">' +
+      '<div>' +
+      '<div class="name">iOS Brew Token buy button is <span class="pill ' + (iosTokenOn ? 'active' : 'stale') + '">' + (iosTokenOn ? 'ON' : 'OFF') + '</span></div>' +
+      '<div class="meta">' + (iosTokenOn ? 'The Brew Token "Buy" button is live on iOS — only turn this on once the Brew Token IAPs are actually Approved in App Store Connect.' : 'iOS shows "not available yet" instead of a Buy button — the Brew Token IAPs are only Prepare for Submission, held out of the app review, and Apple Sandbox can complete a real test purchase for them regardless of that status, so this is a hard block until they\'re genuinely approved.') + '</div>' +
+      '</div>' +
+      '<button class="btn-sm ' + (iosTokenOn ? 'danger' : 'safe') + '" onclick="toggleIosTokenPurchase()">' + (iosTokenOn ? 'Turn OFF' : 'Turn ON (products approved)') + '</button>' +
       '</div>';
     els.forEach((el) => { el.innerHTML = html; });
   }
@@ -2540,6 +2548,18 @@ Don't assume this prompt is fully current — spot-check anything you're about t
     try {
       await call('set_app_config', { iapFreeUnlockEnabled: next });
       appConfigData.iapFreeUnlockEnabled = next;
+      renderAppConfig();
+    } catch (e) { alert('Failed: ' + e.message); }
+  }
+
+  async function toggleIosTokenPurchase() {
+    if (!appConfigData) return;
+    const next = !appConfigData.iosTokenPurchaseEnabled;
+    const verb = next ? 'turn the iOS Brew Token buy button back ON — only do this once the Brew Token IAPs are genuinely Approved in App Store Connect, not just Prepare for Submission' : 'turn the iOS Brew Token buy button OFF — iOS will show "not available yet" instead';
+    if (!confirm('Are you sure you want to ' + verb + '?')) return;
+    try {
+      await call('set_app_config', { iosTokenPurchaseEnabled: next });
+      appConfigData.iosTokenPurchaseEnabled = next;
       renderAppConfig();
     } catch (e) { alert('Failed: ' + e.message); }
   }
