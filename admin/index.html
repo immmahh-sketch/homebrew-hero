@@ -2059,6 +2059,7 @@ Forum notifications now deep-link to and highlight the specific post (to-do #137
 - Never fill in App Store Connect / Play Console credentials, passwords, or answer legal/tax attestations (MRDP, Content Rights) on the user's behalf — flag them and explain, let the user act.
 - If you hit a rate limit/session limit mid-task, retry roughly every 30 minutes for up to 5 hours rather than giving up.
 - Bump BUILD_VERSION before every new test build.
+- (2026-09-15) Every OTA publish and native build goes to "staging" only — never "production" — until Paul explicitly says to ship a specific batch. To promote an already-published staging update byte-for-byte: eas update:republish --channel staging --destination-channel production. A change that adds a brand-new native dependency can ONLY ever go to staging, full stop, even after this rule is eventually relaxed for routine JS work — see this file's own 2026-09-15 launch-plan section for why (it can crash the app on an old binary).
 
 === MEMORY SYSTEM ===
 There is a separate persistent memory system at C:\\Users\\GM\\.claude\\projects\\C--BrewBuddy-App\\memory\\ (MEMORY.md is the index) that a Claude Code session normally reads automatically — this prompt is a deliberately self-contained BACKUP of that in case memory itself is ever lost or you're starting in a context that doesn't have it loaded, so it repeats some of the same ground on purpose. If you do have access to that memory folder, read it too and prefer it for anything more recent than this prompt's last update.
