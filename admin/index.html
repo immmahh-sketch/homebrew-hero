@@ -2561,8 +2561,66 @@ Don't assume this prompt is fully current — spot-check anything you're about t
       '<div class="meta">' + (iosTokenOn ? 'The Brew Token "Buy" button is live on iOS — only turn this on once the Brew Token IAPs are actually Approved in App Store Connect.' : 'iOS shows "not available yet" instead of a Buy button — the Brew Token IAPs are only Prepare for Submission, held out of the app review, and Apple Sandbox can complete a real test purchase for them regardless of that status, so this is a hard block until they\'re genuinely approved.') + '</div>' +
       '</div>' +
       '<button class="btn-sm ' + (iosTokenOn ? 'danger' : 'safe') + '" onclick="toggleIosTokenPurchase()">' + (iosTokenOn ? 'Turn OFF' : 'Turn ON (products approved)') + '</button>' +
-      '</div>';
+      '</div>' +
+      renderForceUpdateGate();
     els.forEach((el) => { el.innerHTML = html; });
+  }
+
+  // Force-update gate (Paul, 2026-09-15: "can we make the app not run
+  // until they download the update?") — a device below the minimum
+  // version_code/build_number sees a full-screen "Update Required" wall,
+  // nothing else in the app reachable. gateOn is the escape-hatch kill
+  // switch Paul explicitly asked for: leave it ON so the gate is live the
+  // moment a real minimum is set below, but flip it OFF instantly here if
+  // it ever traps a tester who genuinely can't update yet.
+  function renderForceUpdateGate() {
+    const gateOn = appConfigData.forceUpdateGateEnabled;
+    const minAndroid = appConfigData.minAndroidVersionCode;
+    const minIos = appConfigData.minIosBuildNumber;
+    return (
+      '<div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--border);">' +
+      '<div style="display:flex; align-items:center; justify-content:space-between;">' +
+      '<div>' +
+      '<div class="name">Force-update gate is <span class="pill ' + (gateOn ? 'active' : 'stale') + '">' + (gateOn ? 'ON' : 'OFF') + '</span></div>' +
+      '<div class="meta">' + (gateOn ? 'A device below the minimum version below sees a full-screen "Update Required" wall — nothing else in the app is reachable until they update.' : 'Escape hatch is engaged — every device passes regardless of version. Use this if the gate ever traps someone who can\'t update yet.') + '</div>' +
+      '</div>' +
+      '<button class="btn-sm ' + (gateOn ? 'danger' : 'safe') + '" onclick="toggleForceUpdateGate()">' + (gateOn ? 'Turn OFF (escape hatch)' : 'Turn ON') + '</button>' +
+      '</div>' +
+      '<div style="display:flex; gap:16px; margin-top:10px; align-items:flex-end; flex-wrap:wrap;">' +
+      '<div><label class="meta" style="display:block; margin-bottom:4px;">Min Android versionCode</label>' +
+      '<input type="number" id="minAndroidVersionInput" value="' + (minAndroid ?? '') + '" placeholder="none" style="width:120px;" /></div>' +
+      '<div><label class="meta" style="display:block; margin-bottom:4px;">Min iOS buildNumber</label>' +
+      '<input type="number" id="minIosVersionInput" value="' + (minIos ?? '') + '" placeholder="none" style="width:120px;" /></div>' +
+      '<button class="btn-sm safe" onclick="saveForceUpdateMinimums()">Save minimums</button>' +
+      '</div>' +
+      '</div>'
+    );
+  }
+
+  async function toggleForceUpdateGate() {
+    if (!appConfigData) return;
+    const next = !appConfigData.forceUpdateGateEnabled;
+    const verb = next ? 'turn the force-update gate back ON' : 'turn the force-update gate OFF (escape hatch) — every device will pass regardless of version until you turn it back on';
+    if (!confirm('Are you sure you want to ' + verb + '?')) return;
+    try {
+      await call('set_app_config', { forceUpdateGateEnabled: next });
+      appConfigData.forceUpdateGateEnabled = next;
+      renderAppConfig();
+    } catch (e) { alert('Failed: ' + e.message); }
+  }
+
+  async function saveForceUpdateMinimums() {
+    if (!appConfigData) return;
+    const androidRaw = document.getElementById('minAndroidVersionInput').value.trim();
+    const iosRaw = document.getElementById('minIosVersionInput').value.trim();
+    const minAndroidVersionCode = androidRaw === '' ? null : parseInt(androidRaw, 10);
+    const minIosBuildNumber = iosRaw === '' ? null : parseInt(iosRaw, 10);
+    try {
+      await call('set_app_config', { minAndroidVersionCode, minIosBuildNumber });
+      appConfigData.minAndroidVersionCode = minAndroidVersionCode;
+      appConfigData.minIosBuildNumber = minIosBuildNumber;
+      renderAppConfig();
+    } catch (e) { alert('Failed: ' + e.message); }
   }
 
   async function toggleIapLenientMode() {
