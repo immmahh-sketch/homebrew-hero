@@ -765,10 +765,10 @@
       <table class="data-table">
         <thead>
           <tr>
-            <th>Username</th><th>Email</th><th>Language</th><th>Location</th><th>Tier</th><th>Premium Since</th><th>Renews</th><th>Signed Up</th><th>Last Sign-In</th><th>Last Used App</th><th>OTA Version</th><th>Tester Mode</th><th></th>
+            <th>Username</th><th>Email</th><th>Language</th><th>Location</th><th>Platform</th><th>Tier</th><th>Premium Since</th><th>Renews</th><th>Lifetime Spend</th><th>Signed Up</th><th>Last Sign-In</th><th>Last Used App</th><th>OTA Version</th><th>Tester Mode</th><th></th>
           </tr>
         </thead>
-        <tbody id="usersTableBody"><tr><td colspan="13" class="empty-note">Loading…</td></tr></tbody>
+        <tbody id="usersTableBody"><tr><td colspan="15" class="empty-note">Loading…</td></tr></tbody>
       </table>
     </section>
 
@@ -3033,6 +3033,24 @@ Don't assume this prompt is fully current — spot-check anything you're about t
 
     renderLanguageLocationStats();
 
+    // Merges the Devices & AI Spend tab's per-device data (platform,
+    // lifetime spend) into this per-user table by userId, so "spend per
+    // device and username" is visible in one place instead of two tabs a
+    // brewer has to cross-reference by hand (admin to-do #131). A user
+    // with more than one device shows every distinct platform seen and
+    // spend summed across all of them — device_spend_report only ever
+    // includes a device once it has a known userId (device_registry's own
+    // user_id, set on every metered AI call), so a device that's never
+    // made a metered call yet just doesn't contribute here.
+    const spendByUser = new Map();
+    for (const d of (deviceSpendData ? deviceSpendData.devices : []) || []) {
+      if (!d.userId) continue;
+      let agg = spendByUser.get(d.userId);
+      if (!agg) { agg = { platforms: new Set(), lifetimeGbp: 0 }; spendByUser.set(d.userId, agg); }
+      if (d.platform) agg.platforms.add(d.platform);
+      agg.lifetimeGbp += Number(d.spendLifetimeGbp) || 0;
+    }
+
     const q = document.getElementById('userSearch').value.trim().toLowerCase();
     const rows = usersData.users
       .filter((u) => !q || (u.email || '').toLowerCase().includes(q) || (u.displayName || '').toLowerCase().includes(q))
@@ -3040,16 +3058,22 @@ Don't assume this prompt is fully current — spot-check anything you're about t
       .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
     const body = document.getElementById('usersTableBody');
-    if (!rows.length) { body.innerHTML = '<tr><td colspan="13" class="empty-note">No matching accounts.</td></tr>'; return; }
-    body.innerHTML = rows.map((u) => (
+    if (!rows.length) { body.innerHTML = '<tr><td colspan="15" class="empty-note">No matching accounts.</td></tr>'; return; }
+    body.innerHTML = rows.map((u) => {
+      const spend = spendByUser.get(u.userId) || null;
+      const platformCell = spend && spend.platforms.size ? Array.from(spend.platforms).map(platformLabel).join(' / ') : '—';
+      const spendCell = spend ? '£' + spend.lifetimeGbp.toFixed(2) : '£0.00';
+      return (
       '<tr>' +
       '<td>' + (u.displayName || '—') + (u.forumBanned ? ' <span class="pill banned">FORUM BANNED</span>' : '') + '</td>' +
       '<td>' + (u.email || '—') + '</td>' +
       '<td>' + languageLabel(u.language) + '</td>' +
       '<td>' + countryLabel(u.country) + '</td>' +
+      '<td>' + platformCell + '</td>' +
       '<td><span class="pill ' + (u.premiumEnabled ? tierPillClass(u.aiTier) : 'free') + '">' + (u.premiumEnabled ? tierLabel(u.aiTier) : 'Free') + '</span></td>' +
       '<td>' + fmtDate(u.premiumSince) + '</td>' +
       '<td>' + renewalCell(u) + '</td>' +
+      '<td>' + spendCell + '</td>' +
       '<td>' + fmtDate(u.createdAt) + '</td>' +
       '<td>' + fmtDate(u.lastSignInAt) + '</td>' +
       '<td>' + fmtDate(u.lastAppOpenAt) + '</td>' +
@@ -3078,7 +3102,8 @@ Don't assume this prompt is fully current — spot-check anything you're about t
           : '') +
       '</td>' +
       '</tr>'
-    )).join('');
+      );
+    }).join('');
   }
 
   function setUserTierFilter(tier) {
