@@ -763,6 +763,15 @@
         the <strong>Developer app</strong> by default, never the real Homebrew Hero app, unless explicitly promoted.
       </div>
       <div class="stat-row" id="buildCurrentVersions"></div>
+
+      <h2 class="section-title" style="margin-top:22px;">What customers can download right now</h2>
+      <div class="footnote" style="margin-bottom:12px;">
+        Checked by hand against the real App Store / Play Store listings and App Store Connect / Play Console —
+        no live store API wired up yet, so this is only as fresh as "Last checked" says. Ask Claude to recheck it
+        whenever you need it current.
+      </div>
+      <div class="stat-row" id="storeStatusCards"></div>
+
       <h2 class="section-title" style="margin-top:22px;">Full log</h2>
       <div class="table-scroll">
         <table class="data-table">
@@ -1802,6 +1811,7 @@
   // --- TO-DO LIST ---
   let todoItems = null;
   let buildLogData = null;
+  let storeStatusData = null;
 
   async function loadTodoList() {
     try {
@@ -1900,14 +1910,35 @@
 
   async function loadBuildLog() {
     try {
-      buildLogData = await call('list_build_events');
+      [buildLogData, storeStatusData] = await Promise.all([call('list_build_events'), call('get_store_status')]);
       renderBuildLog();
     } catch (e) { console.error(e); }
+  }
+
+  function storeStatusCard(label, s) {
+    if (!s) {
+      return '<div class="stat-card"><div class="label">' + label + '</div><div class="value">Not checked yet</div></div>';
+    }
+    return (
+      '<div class="stat-card" style="flex:1 1 280px;">' +
+      '<div class="label">' + label + '</div>' +
+      '<div class="value ' + (s.installableVersion ? 'green' : '') + '" style="font-size:18px;">' + (s.installableVersion || 'Not yet released') + '</div>' +
+      (s.installableNote ? '<div class="footnote" style="margin:6px 0 0;">' + escapeHtml(s.installableNote) + '</div>' : '') +
+      '<div class="footnote" style="margin:8px 0 0; font-weight:700; color:var(--ink);">Review: ' + escapeHtml(s.reviewStatus) + '</div>' +
+      '<div class="footnote" style="margin:4px 0 0;">Last checked: ' + fmtDate(s.checkedAt) + '</div>' +
+      '</div>'
+    );
   }
 
   function renderBuildLog() {
     const versionsEl = document.getElementById('buildCurrentVersions');
     const bodyEl = document.getElementById('buildLogTableBody');
+    const storeEl = document.getElementById('storeStatusCards');
+    if (storeEl) {
+      storeEl.innerHTML = storeStatusData
+        ? storeStatusCard('🍎 iOS — Installable now', storeStatusData.ios) + storeStatusCard('🤖 Android — Installable now', storeStatusData.android)
+        : '<div class="load-note">Loading…</div>';
+    }
     if (!buildLogData) return;
 
     versionsEl.innerHTML = BUILD_APP_ORDER.map((target) => {
