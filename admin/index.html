@@ -765,10 +765,10 @@
       <table class="data-table">
         <thead>
           <tr>
-            <th>Username</th><th>Email</th><th>Language</th><th>Location</th><th>Platform</th><th>Tier</th><th>Premium Since</th><th>Renews</th><th>Lifetime Spend</th><th>Signed Up</th><th>Last Sign-In</th><th>Last Used App</th><th>OTA Version</th><th>Tester Mode</th><th></th>
+            <th>Username</th><th>Email</th><th>Language</th><th>Location</th><th>Platform</th><th>Install Path</th><th>Tier</th><th>Premium Since</th><th>Renews</th><th>Lifetime Spend</th><th>Signed Up</th><th>Last Sign-In</th><th>Last Used App</th><th>OTA Version</th><th>Tester Mode</th><th></th>
           </tr>
         </thead>
-        <tbody id="usersTableBody"><tr><td colspan="15" class="empty-note">Loading…</td></tr></tbody>
+        <tbody id="usersTableBody"><tr><td colspan="16" class="empty-note">Loading…</td></tr></tbody>
       </table>
     </section>
 
@@ -1668,6 +1668,31 @@
     if (p === 'android') return '🤖 Android';
     if (p === 'web') return '🌐 Web';
     return '<span class="load-note" style="padding:0;">—</span>';
+  }
+
+  // Install Path: how a device actually got the app, from bundle_id
+  // (device_registry, sent as x-bundle-id on every AI call — see
+  // src/ai/apiClient.ts / ai-proxy's touchDeviceRegistry) plus testerMode
+  // and platform. com.homebrewhero.app.dev is unambiguous — Paul's own
+  // internal engineering/TestFlight build, never a real customer. The real
+  // app (com.homebrewhero.app) is genuinely ambiguous between TestFlight
+  // and the App Store on iOS with no new native code (Bundle.main's receipt
+  // filename would tell them apart, but that was deliberately not added
+  // this session — untested native code reaching a live build is exactly
+  // what caused a real crash earlier, see the Continuity log), so it's
+  // labelled honestly rather than guessed. testerMode is an account-level
+  // flag (real Play Store closed-testing grant OR a manual admin toggle),
+  // not itself platform-specific, but on Android it's the closest signal
+  // available to a real tester-link install.
+  function installPathLabel(bundleId, testerMode, platform) {
+    if (!bundleId) return null;
+    if (bundleId === 'com.homebrewhero.app.dev') return '🛠️ Internal Dev Build';
+    if (bundleId === 'com.homebrewhero.app') {
+      if (platform === 'android') return testerMode ? '🧪 Play Store (Tester Link)' : '🤖 Play Store';
+      if (platform === 'ios') return testerMode ? '🧪 TestFlight (Tester)' : '🍎 TestFlight / App Store';
+      return testerMode ? '🧪 Tester Link' : 'Official App';
+    }
+    return bundleId;
   }
 
   // --- TO-DO LIST ---
@@ -3160,8 +3185,12 @@ Don't assume this prompt is fully current — spot-check anything you're about t
     for (const d of (deviceSpendData ? deviceSpendData.devices : []) || []) {
       if (!d.userId) continue;
       let agg = spendByUser.get(d.userId);
-      if (!agg) { agg = { platforms: new Set(), lifetimeGbp: 0 }; spendByUser.set(d.userId, agg); }
+      if (!agg) { agg = { platforms: new Set(), installPaths: new Set(), lifetimeGbp: 0 }; spendByUser.set(d.userId, agg); }
       if (d.platform) agg.platforms.add(d.platform);
+      // Kept as bundleId|platform pairs, not two separate sets, so a user
+      // with more than one device (e.g. Paul's own dev build + real app)
+      // never gets a wrong cross-multiplied combination at render time.
+      if (d.bundleId) agg.installPaths.add(d.bundleId + '|' + (d.platform || ''));
       agg.lifetimeGbp += Number(d.spendLifetimeGbp) || 0;
     }
 
@@ -3172,11 +3201,17 @@ Don't assume this prompt is fully current — spot-check anything you're about t
       .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
     const body = document.getElementById('usersTableBody');
-    if (!rows.length) { body.innerHTML = '<tr><td colspan="15" class="empty-note">No matching accounts.</td></tr>'; return; }
+    if (!rows.length) { body.innerHTML = '<tr><td colspan="16" class="empty-note">No matching accounts.</td></tr>'; return; }
     body.innerHTML = rows.map((u) => {
       const spend = spendByUser.get(u.userId) || null;
       const platformCell = spend && spend.platforms.size ? Array.from(spend.platforms).map(platformLabel).join(' / ') : '—';
       const spendCell = spend ? '£' + spend.lifetimeGbp.toFixed(2) : '£0.00';
+      const installPathCell = spend && spend.installPaths.size
+        ? Array.from(spend.installPaths)
+            .map((pair) => { const [bundleId, platform] = pair.split('|'); return installPathLabel(bundleId, u.testerMode, platform); })
+            .filter(Boolean)
+            .join(' / ')
+        : '—';
       return (
       '<tr>' +
       '<td>' + (u.displayName || '—') + (u.forumBanned ? ' <span class="pill banned">FORUM BANNED</span>' : '') + '</td>' +
@@ -3184,6 +3219,7 @@ Don't assume this prompt is fully current — spot-check anything you're about t
       '<td>' + languageLabel(u.language) + '</td>' +
       '<td>' + countryLabel(u.country) + '</td>' +
       '<td>' + platformCell + '</td>' +
+      '<td>' + installPathCell + '</td>' +
       '<td><span class="pill ' + (u.premiumEnabled ? tierPillClass(u.aiTier) : 'free') + '">' + (u.premiumEnabled ? tierLabel(u.aiTier) : 'Free') + '</span></td>' +
       '<td>' + fmtDate(u.premiumSince) + '</td>' +
       '<td>' + renewalCell(u) + '</td>' +
