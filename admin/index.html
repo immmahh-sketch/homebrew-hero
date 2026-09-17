@@ -647,6 +647,7 @@
       <div class="tab-group">
         <div class="tab-group-label">Task Tracking</div>
         <button class="tab-btn" data-tab="todolist" data-label="To-Do List">To-Do List</button>
+        <button class="tab-btn" data-tab="buildlog" data-label="Build &amp; OTA Tracking">Build &amp; OTA Tracking</button>
       </div>
       <div class="tab-group">
         <div class="tab-group-label">People</div>
@@ -750,6 +751,26 @@
       <div id="todoDoneSection">
         <h2 class="section-title" style="font-size:14px; margin-top:24px;">Completed</h2>
         <div id="todoDoneList" class="todo-list"><div class="empty-note">Loading…</div></div>
+      </div>
+    </section>
+
+    <!-- BUILD & OTA TRACKING -->
+    <section class="panel" id="panel-buildlog">
+      <div class="footnote" style="margin-bottom:16px;">
+        One row per event — a native build shipping, or an OTA update publishing — against whichever of the four
+        real apps it actually reaches. Native builds log themselves automatically as the final step of their own
+        GitHub Actions workflow; OTA publishes are logged by hand right after each one. Fresh native builds go to
+        the <strong>Developer app</strong> by default, never the real Homebrew Hero app, unless explicitly promoted.
+      </div>
+      <div class="stat-row" id="buildCurrentVersions"></div>
+      <h2 class="section-title" style="margin-top:22px;">Full log</h2>
+      <div class="table-scroll">
+        <table class="data-table">
+          <thead>
+            <tr><th>When</th><th>App</th><th>Kind</th><th>Version</th><th>Native</th><th>Channel</th><th>Message</th></tr>
+          </thead>
+          <tbody id="buildLogTableBody"><tr><td colspan="7" class="empty-note">Loading…</td></tr></tbody>
+        </table>
       </div>
     </section>
 
@@ -1780,6 +1801,7 @@
 
   // --- TO-DO LIST ---
   let todoItems = null;
+  let buildLogData = null;
 
   async function loadTodoList() {
     try {
@@ -1868,13 +1890,56 @@
     }
   }
 
+  const BUILD_APP_LABELS = {
+    ios_dev: '🛠️ iOS — Developer app',
+    ios_published: '🍎 iOS — Homebrew Hero',
+    android_testing: '🤖 Android — Testing',
+    android_published: '🤖 Android — Published',
+  };
+  const BUILD_APP_ORDER = ['ios_dev', 'ios_published', 'android_testing', 'android_published'];
+
+  async function loadBuildLog() {
+    try {
+      buildLogData = await call('list_build_events');
+      renderBuildLog();
+    } catch (e) { console.error(e); }
+  }
+
+  function renderBuildLog() {
+    const versionsEl = document.getElementById('buildCurrentVersions');
+    const bodyEl = document.getElementById('buildLogTableBody');
+    if (!buildLogData) return;
+
+    versionsEl.innerHTML = BUILD_APP_ORDER.map((target) => {
+      const current = buildLogData.currentByApp[target];
+      const label = BUILD_APP_LABELS[target];
+      if (!current) return statCard(label, 'No builds yet');
+      const value = current.buildVersion + (current.channel ? ' (' + current.channel + ')' : '');
+      return statCard(label, value, 'green');
+    }).join('');
+
+    const events = buildLogData.events || [];
+    if (!events.length) { bodyEl.innerHTML = '<tr><td colspan="7" class="empty-note">No build/OTA events logged yet.</td></tr>'; return; }
+    bodyEl.innerHTML = events.map((e) => (
+      '<tr>' +
+      '<td>' + fmtDate(e.createdAt) + '</td>' +
+      '<td>' + (BUILD_APP_LABELS[e.appTarget] || e.appTarget) + '</td>' +
+      '<td>' + (e.kind === 'native_build' ? '📦 Native build' : '⚡ OTA publish') + '</td>' +
+      '<td>' + e.buildVersion + '</td>' +
+      '<td>' + (e.nativeVersion ? e.nativeVersion + (e.nativeBuildNumber ? ' (' + e.nativeBuildNumber + ')' : '') : '—') + '</td>' +
+      '<td>' + (e.channel || '—') + '</td>' +
+      '<td>' + escapeHtml(e.message) + '</td>' +
+      '</tr>'
+    )).join('');
+  }
+
   async function refreshAll() {
     const btn = document.getElementById('refreshAllBtn');
     const originalText = btn.textContent;
     btn.disabled = true;
     btn.textContent = '↻ Refreshing…';
     try {
-      const results = await Promise.allSettled([loadUsers(), loadDevices(), loadKits(), loadSpend(), loadUptake(), loadRevenue(), loadProfit(), loadDeviceSpend(), loadSuggestions(), loadCountryRequests(), loadCloneRequests(), loadBrandLogoGaps(), loadTesters(), loadQrScans(), loadSiteVisits(), loadGrowthStats(), loadWinbackOffers(), loadAppConfig(), loadKillSwitchAlerts(), loadForumContent(), loadSpecialRoles(), loadModerationLog(), loadRecipeBoard(), loadBlockedNames(), loadCancellationFeedback(), loadMailingList(), loadRetailerCatalog(), loadAiCallLog(), loadFeatureUsage(), loadAiReports(), loadTodoList(), loadClientErrors()]);
+      const results = await Promise.allSettled([loadUsers(), loadDevices(), loadKits(), loadSpend(), loadUptake(), loadRevenue(), loadProfit(), loadDeviceSpend(), loadSuggestions(), loadCountryRequests(), loadCloneRequests(), loadBrandLogoGaps(), loadTesters(), loadQrScans(), loadSiteVisits(), loadGrowthStats(), loadWinbackOffers(), loadAppConfig(), loadKillSwitchAlerts(), loadForumContent(), loadSpecialRoles(), loadModerationLog(), loadRecipeBoard(), loadBlockedNames(), loadCancellationFeedback(), loadMailingList(), loadRetailerCatalog(), loadAiCallLog(), loadFeatureUsage(), loadAiReports(), loadTodoList(), loadClientErrors(), loadBuildLog()]);
       const failed = results.filter((r) => r.status === 'rejected');
       if (failed.length > 0) {
         console.error('refreshAll: sections that failed to load', failed);
