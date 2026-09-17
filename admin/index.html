@@ -77,7 +77,11 @@
   }
   #loginError { color: var(--red); font-size: 13px; min-height: 18px; }
 
-  #app { display: none; }
+  /* Visibility toggle for #loginScreen/#app is done via this class (JS,
+     tryLogin()), not inline styles -- an inline display would out-rank the
+     desktop media query's #app{display:grid} rule below and silently break
+     the sidebar layout on a wide screen after every login. */
+  .hidden { display: none !important; }
   header.top {
     padding: 14px 16px;
     border-bottom: 1px solid var(--border);
@@ -183,6 +187,74 @@
   main { padding: 18px 16px 60px; max-width: 720px; margin: 0 auto; }
   @media (min-width: 720px) {
     main { padding: 22px 26px 60px; }
+  }
+
+  /* ===== Desktop layout (>=1100px) ==========================================
+     Everything above this point is the phone/tablet experience and stays
+     exactly as it was — this block only ADDS a wider treatment on top of it,
+     same markup and JS throughout (the drawer nav becomes a permanent
+     sidebar purely via display/position, no structural change), so there's
+     one file to keep in sync rather than two drifting copies. Paul,
+     2026-09-16: "create a desktop version... keep the current version as
+     the mobile version." */
+  @media (min-width: 1100px) {
+    /* Grid, not fixed positioning — header spans both columns on its own
+       row, sidebar and main content sit side by side below it on the next
+       row. Avoids needing to know the header's exact pixel height (it can
+       wrap, grow with the kill-switch badge, etc.) the way a fixed-position
+       sidebar starting at a guessed offset would. Targets #app specifically
+       (header/.tabs-nav/main's real parent — #loginScreen is body's OTHER
+       child, sibling to #app, and must keep its own independent centering
+       untouched). */
+    #app {
+      display: grid;
+      grid-template-columns: 248px 1fr;
+      grid-template-rows: auto 1fr;
+      min-height: 100vh;
+    }
+    header.top { grid-column: 1 / 3; grid-row: 1; padding: 16px 28px; }
+
+    .tabs-nav {
+      grid-column: 1; grid-row: 2;
+      position: sticky;
+      top: 0;
+      align-self: start;
+      max-height: 100vh;
+      border-bottom: none;
+      border-right: 1px solid var(--border);
+      overflow-y: auto;
+    }
+    .menu-toggle { display: none; }
+    .tabs-drawer {
+      display: block;
+      position: static;
+      max-height: none;
+      box-shadow: none;
+      background: transparent;
+      border-bottom: none;
+    }
+    .tabs-drawer-backdrop { display: none !important; }
+    .tab-group { padding: 8px 0; }
+    .tabs-drawer .tab-btn { padding: 9px 20px; font-size: 13.5px; }
+    .tabs-drawer .tab-btn.active { border-left: 3px solid var(--amber); padding-left: 17px; }
+
+    main {
+      grid-column: 2; grid-row: 2;
+      max-width: 1400px;
+      padding: 28px 40px 70px;
+    }
+
+    /* Every card/table row gets real breathing room instead of wrapping
+       tight on a narrow column — same cards, just allowed to sit at their
+       natural width across a wide row instead of stacking early. */
+    .stat-card { min-width: 168px; }
+    .lang-loc-col { min-width: 260px; }
+
+    /* A data table no longer needs to scroll to be read on a wide screen —
+       let it size to its content up to the full main width instead of the
+       phone-width horizontal-scroll treatment. */
+    .table-scroll { overflow-x: visible; }
+    table.data-table { width: 100%; }
   }
 
   /* Every data table scrolls horizontally within its own wrapper instead of
@@ -547,7 +619,7 @@
   <div id="loginError"></div>
 </div>
 
-<div id="app">
+<div id="app" class="hidden">
   <header class="top">
     <div>
       <h1>🍺 Homebrew Hero — Admin</h1>
@@ -638,6 +710,14 @@
         first-time-upgrade count. "Inactive, free" is the pool winback-processor's daily job emails a one-time 50%-off
         offer to (see Win-back Offers tab) — free accounts that have never gone premium and haven't opened the app in
         30+ days, or never recorded an open at all.
+      </div>
+
+      <h2 class="section-title">New users — last 30 days, by day</h2>
+      <div class="chart-wrap">
+        <div class="bar-chart" id="newUsersChart"><div class="load-note">Loading…</div></div>
+      </div>
+      <div class="footnote" style="margin-bottom:22px;">
+        Real signups (auth.users.created_at), one bar per day — a quiet day shows as a genuine zero, not a gap.
       </div>
 
       <h2 class="section-title">AI spend — last 4 months, by day</h2>
@@ -1350,8 +1430,11 @@
     try {
       await call('list_users');
       localStorage.setItem('hh_admin_secret', SECRET);
-      document.getElementById('loginScreen').style.display = 'none';
-      document.getElementById('app').style.display = 'block';
+      // Classes, not inline styles -- an inline style would out-rank the
+      // desktop media query's #app{display:grid} rule and silently break
+      // the sidebar layout on a wide screen after every login.
+      document.getElementById('loginScreen').classList.add('hidden');
+      document.getElementById('app').classList.remove('hidden');
       refreshAll();
     } catch (e) {
       document.getElementById('loginError').textContent = 'Wrong secret or network error: ' + e.message;
@@ -3072,11 +3155,18 @@ Don't assume this prompt is fully current — spot-check anything you're about t
     if (!growthData) { el.innerHTML = '<div class="load-note">Loading…</div>'; return; }
     const u = growthData.newUpgrades30d || {};
     el.innerHTML = [
-      statCard('New Accounts', growthData.newAccounts30d, 'green'),
-      statCard('New Upgrades — Standard / Power User / Ultimate', (u.standard||0) + ' / ' + (u.powerBrewer||0) + ' / ' + (u.ultimate||0), 'green'),
-      statCard('Lapsed Premium', growthData.newLapsed30d, growthData.newLapsed30d > 0 ? 'red' : ''),
-      statCard('Inactive, Free (winback pool)', growthData.inactiveNeverUpgraded),
+      statCard('New Accounts', growthData.newAccounts30d, 'green', 'users'),
+      statCard('New Upgrades — Standard / Power User / Ultimate', (u.standard||0) + ' / ' + (u.powerBrewer||0) + ' / ' + (u.ultimate||0), 'green', 'revenue'),
+      statCard('Lapsed Premium', growthData.newLapsed30d, growthData.newLapsed30d > 0 ? 'red' : '', 'revenue'),
+      statCard('Inactive, Free (winback pool)', growthData.inactiveNeverUpgraded, '', 'winback'),
     ].join('');
+
+    renderBarChart(document.getElementById('newUsersChart'), growthData.newAccountsByDay || null, {
+      getValue: (d) => d.count,
+      formatTip: (d) => fmtDate(d.day) + ': ' + d.count + ' new user' + (d.count === 1 ? '' : 's'),
+      formatScale: (n) => String(Math.round(n)),
+      emptyNote: 'No signups in the last 30 days.',
+    });
   }
 
   async function loadKillSwitchAlerts() {
