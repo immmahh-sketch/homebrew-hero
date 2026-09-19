@@ -584,6 +584,22 @@
   .kill-switch-row .meta { font-size: 12.5px; color: var(--ink); line-height: 1.5; }
   .kill-switch-row .meta .mono { color: var(--muted); }
   .kill-switch-row .actions { display: flex; gap: 6px; flex-shrink: 0; }
+  .inkbird-share-banner {
+    background: rgba(227,165,66,0.1);
+    border: 1px solid rgba(227,165,66,0.4);
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-bottom: 18px;
+  }
+  .inkbird-share-banner-title { font-size: 13px; font-weight: 700; color: var(--amber); margin-bottom: 10px; }
+  .inkbird-share-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 8px 0; border-top: 1px solid rgba(227,165,66,0.2);
+  }
+  .inkbird-share-row:first-of-type { border-top: none; }
+  .inkbird-share-row .meta { font-size: 12.5px; color: var(--ink); line-height: 1.5; }
+  .inkbird-share-row .meta .mono { color: var(--muted); }
+  .inkbird-share-row .actions { display: flex; gap: 6px; flex-shrink: 0; }
   .tab-badge {
     display: inline-flex; align-items: center; justify-content: center;
     min-width: 16px; height: 16px; padding: 0 4px; margin-left: 5px;
@@ -637,6 +653,7 @@
       <span class="menu-toggle-icon">☰</span>
       <span id="currentTabLabel">Overview</span>
       <span class="menu-toggle-badge" id="killSwitchTabBadge" style="display:none;"></span>
+      <span class="menu-toggle-badge" id="inkbirdShareTabBadge" style="display:none;"></span>
     </button>
     <div class="tabs-drawer" id="tabsDrawer">
       <div class="tab-group">
@@ -701,6 +718,7 @@
     <!-- OVERVIEW -->
     <section class="panel active" id="panel-overview">
       <div id="killSwitchBanner"></div>
+      <div id="inkbirdShareBanner"></div>
       <div class="stat-row" id="overviewStats"></div>
 
       <h2 class="section-title">Growth — last 30 days</h2>
@@ -1432,7 +1450,7 @@
   const ANON_KEY = 'sb_publishable_tFB-sh1Zh7lk0StvG9aGdw_v6LCEyck';
 
   let SECRET = localStorage.getItem('hh_admin_secret') || '';
-  let usersData = null, devicesData = null, kitsData = null, spendData = null, suggestionsData = null, countryRequestsData = null, cloneRequestsData = null, testersData = null, qrScansData = null, growthData = null, winbackData = null, appConfigData = null, killSwitchData = null, trafficData = null, cancellationFeedbackData = null, mailingListData = null;
+  let usersData = null, devicesData = null, kitsData = null, spendData = null, suggestionsData = null, countryRequestsData = null, cloneRequestsData = null, testersData = null, qrScansData = null, growthData = null, winbackData = null, appConfigData = null, killSwitchData = null, trafficData = null, cancellationFeedbackData = null, mailingListData = null, inkbirdShareData = null;
   let uptakeData = null, revenueData = null, profitData = null, deviceSpendData = null;
   let forumData = null, recipeBoardData = null, blockedNamesData = null;
   let deviceFilter = 'all';
@@ -1970,7 +1988,7 @@
     btn.disabled = true;
     btn.textContent = '↻ Refreshing…';
     try {
-      const results = await Promise.allSettled([loadUsers(), loadDevices(), loadKits(), loadSpend(), loadUptake(), loadRevenue(), loadProfit(), loadDeviceSpend(), loadSuggestions(), loadCountryRequests(), loadCloneRequests(), loadBrandLogoGaps(), loadTesters(), loadQrScans(), loadSiteVisits(), loadGrowthStats(), loadWinbackOffers(), loadAppConfig(), loadKillSwitchAlerts(), loadForumContent(), loadSpecialRoles(), loadModerationLog(), loadRecipeBoard(), loadBlockedNames(), loadCancellationFeedback(), loadMailingList(), loadRetailerCatalog(), loadAiCallLog(), loadFeatureUsage(), loadAiReports(), loadTodoList(), loadClientErrors(), loadBuildLog()]);
+      const results = await Promise.allSettled([loadUsers(), loadDevices(), loadKits(), loadSpend(), loadUptake(), loadRevenue(), loadProfit(), loadDeviceSpend(), loadSuggestions(), loadCountryRequests(), loadCloneRequests(), loadBrandLogoGaps(), loadTesters(), loadQrScans(), loadSiteVisits(), loadGrowthStats(), loadWinbackOffers(), loadAppConfig(), loadKillSwitchAlerts(), loadInkbirdShareRequests(), loadForumContent(), loadSpecialRoles(), loadModerationLog(), loadRecipeBoard(), loadBlockedNames(), loadCancellationFeedback(), loadMailingList(), loadRetailerCatalog(), loadAiCallLog(), loadFeatureUsage(), loadAiReports(), loadTodoList(), loadClientErrors(), loadBuildLog()]);
       const failed = results.filter((r) => r.status === 'rejected');
       if (failed.length > 0) {
         console.error('refreshAll: sections that failed to load', failed);
@@ -3342,6 +3360,50 @@ Don't assume this prompt is fully current — spot-check anything you're about t
       await call('acknowledge_kill_switch_alert', { id });
       await Promise.all([loadDevices(), loadKillSwitchAlerts()]);
     } catch (e) { alert('Failed to unban: ' + e.message); }
+  }
+
+  async function loadInkbirdShareRequests() {
+    try {
+      inkbirdShareData = await call('list_inkbird_share_requests');
+      renderInkbirdShareRequests();
+    } catch (e) { console.error(e); }
+  }
+
+  function renderInkbirdShareRequests() {
+    const badge = document.getElementById('inkbirdShareTabBadge');
+    const banner = document.getElementById('inkbirdShareBanner');
+    if (!inkbirdShareData) return;
+    const pending = inkbirdShareData.requests.filter((r) => r.status === 'pending');
+
+    if (pending.length) {
+      badge.textContent = pending.length;
+      badge.style.display = 'inline-flex';
+    } else {
+      badge.style.display = 'none';
+    }
+
+    if (!pending.length) { banner.innerHTML = ''; return; }
+    banner.innerHTML =
+      '<div class="inkbird-share-banner">' +
+      '<div class="inkbird-share-banner-title">🌡️ Inkbird WiFi share' + (pending.length === 1 ? '' : 's') + ' waiting — ' + pending.length + ' pending (24hr SLA shown to the brewer)</div>' +
+      pending.map((r) => (
+        '<div class="inkbird-share-row">' +
+        '<div class="meta">' + escapeHtml(r.user_email || r.user_id) + ' — code <span class="mono">' + escapeHtml(r.claim_code) + '</span>' +
+        ' — region ' + escapeHtml(r.region) +
+        ' — requested ' + fmtDate(r.created_at) + '</div>' +
+        '<div class="actions">' +
+        '<button class="btn-sm safe" onclick=\'completeInkbirdShareRequest(' + JSON.stringify(r.id) + ')\'>Mark added</button>' +
+        '</div></div>'
+      )).join('') +
+      '<div class="footnote">Accept the share for each code above in SmartLife/Tuya Smart, then mark it added here. This list is just a tracker — accepting still has to happen in the Tuya app itself.</div>' +
+      '</div>';
+  }
+
+  async function completeInkbirdShareRequest(id) {
+    try {
+      await call('complete_inkbird_share_request', { id });
+      await loadInkbirdShareRequests();
+    } catch (e) { alert('Failed to mark as added: ' + e.message); }
   }
 
   function renderSpendChart() {
